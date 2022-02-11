@@ -1,0 +1,19 @@
+Multiprocessor Assignment #1
+
+Reporting:
+	Hours: 2,5h
+
+Installing Visual Studio 2019 and C/C++ compiler tools
+	* They were already installed on my machine
+Installing the SDK and support for AMD CPU (FX-8350) & AMD GPU (RX 580)
+	* Downloaded the SDK: https://github.com/GPUOpen-LibrariesAndSDKs/OCL-SDK/releases/tag/1.0
+	* The graphics card already had an OpenCL driver installed
+
+The driver is located in C:\Windows\system32\OpenCL.dll (for 32-bit) and in C:\Windows\SysWOW64\OpenCL.dll (for 64-bit)
+
+Linked libs and include directories thtough Visual Studio project configuration.
+
+Ran examples with it to test it works. However, most if not all of the examples contained some deprecated function calls (e.g. clClearCommandQueue -> clClearCommandQueueWithProperties), which had to be changed to make the program work.
+Apparently the examples are still in OpenCL 1.x or 2.x instead of 3.0, which is unfortunate.
+
+Then I studied the OpenCL library a bit to get somewhat familiar with it.

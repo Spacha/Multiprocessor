@@ -1,0 +1,9 @@
+Assignment: OpenCL Introduction
+
+Task:  Element-wise addition of two matrices. 
+
+Implement a C program, that performs element-wise addition of two matrices. The implementation should define a "Add_Matrix" function that considers 2 100x100 matrices as input. The matrices have to be created using two dimensional pointers such as malloc, calloc etc. The final execution time of the implementation should be displayed as output. 
+Similarly, implement a simple OpenCL kernel "add_matrix" performing element-wise addition of two matrices. The add_matrix kernel should consider two matrices as the input similar to C function. The final execution time of the implementation should be displayed as output. Also, display the compute device information that is used for this implementation as the output (Check the "HelloWorld" report attached here for reference)  
+Expected result: A working code and 2 page report, all together in the form of a compressed folder  
+
+The report should contain about the task solved, brief description of your implement and the final screenshot of your outputs asked to be displayed under the assignment. In case any of them are very new to OpenCL, I am sharing a simple HelloWorld program report as an attachment here for reference.  Please, upload your compressed folders using "studentname_studentnumber_assignment2.zip". 

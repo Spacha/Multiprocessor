@@ -1,0 +1,24 @@
+Task: OpenCL continuation
+
+Implement an OpenCL program that reads an image, converts to grey scale, applies a 5x5 filter to it and saves the final image
+Profiling the implemented OpenCL program
+Description of the tasks, necessary instructions and resources are all included as an attachment here. Please go through them
+
+Expected Result: A working implementation, saved final image and a 1-2 page brief report. Please don't forget to include your working hours and references (if any) in the report
+
+
+Praneeth Susarla:
+
+I am sharing some pointers here for assignment 3 based on the different queries some students had recently.
+
+1. Kernel function implementation is not exactly the same as C/C++ implementation. Remember the parallelization that can be performed on OpenCL devices and design your kernel functions. Refer OpenCL programming guide (shared on moodle) and any other websites for OpenCL kernel function examples
+
+2. Gray Scaling has only a single channel or no channel whereas an RGBA format image has 4 channels (R, G,B and A) in them. The image files shared under assignment 3 are of RGBA format. For gray scale conversion, you can refer to an example in this link: http://support.ptc.com/help/mathcad/en/index.html#page/PTC_Mathcad_Help/example_grayscale_and_color_in_images.html
+
+Remember, there are different gray scale conversion formulae available. Any such conversion is sufficient for this assignment.
+
+3.  In case you are still unfamiliar with usage of lodepng.h and lodepng.cpp files, "lodepng_decode_file()" read the image files of any channel format (RGB, RGBA ...) and store in a unsigned char buffer. Similarly, "lodepng_encode_file()" write the unsigned char buffer vallues into image file with different channel format. You can refer to these functions directly from lodepng.h.
+
+Note: These are two example function prototypes helpful to read and write the images. Other such function prototypes from lodepng.h can only be used.
+
+4. You can choose different (5x5) filters of your choice in this assignment. For example, simplest 5x5 filter could be a mean filter. Similarly, edge filter or any other different filter can also be used.
