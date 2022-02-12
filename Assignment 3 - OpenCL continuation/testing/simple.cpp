@@ -102,18 +102,25 @@ cl_int displayDeviceInfo(cl_device_id device)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// See OpenCL Programming Guide p.342.
+
 // OpenCL kernel. Each work item takes care of one element of C.
 const char *kernelSource = "\n" \
 "__kernel void add_matrix(__read_only image2d_t in,                           \n" \
-"                         __write_only image2d_t out)                         \n" \
+"                         __write_only image2d_t out,                         \n" \
+"                         sampler_t sampler)                                  \n" \
 "{                                                                            \n" \
 "    // get our global thread ID                                              \n" \
 "    int id = (get_global_id(1) * get_global_size(0)) + get_global_id(0);     \n" \
 "                                                                             \n" \
 "    /*c[id] = a[id] + b[id];*/                                               \n" \
-"    float4 clr = (0.5f, 0.5f, 0.5f, 0.5f);                                   \n" \
+"    //float4 clr = (0.5f, 0.5f, 0.5f, 0.5f);                                 \n" \
 "    int2 coord = (get_global_id(0), get_global_id(1));                       \n" \
-"    write_imagef(out, coord, clr);                                           \n" \
+"    float4 clr = read_imagef(in, sampler, coord);                            \n" \
+"                                                                             \n" \
+"    write_imagef(out, coord, (float4)(coord[0]/2.0f, coord[1]/3.0f, 1.0f,1.0f));               \n" \
+"    // write_imagef(out, coord, (float4)(0.25f,0.5f,0.75f,1.0f));               \n" \
+"    // write_imagef(out, coord, clr);                                           \n" \
 "}                                                                            \n" \
 "\n";
 
@@ -135,15 +142,22 @@ int main()
     cl_program program;                 // program
     cl_kernel kernel;                   // kernel
 
-    size_t width = 2;
+    size_t width = 6;
     size_t height = 3;
     size_t bytes = 4 * width * height;
 
+    const unsigned char imgData[bytes] = {
+        0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0xff,  0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0xff,  0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0xff,
+        0x40,0x40,0x40,0xff,  0x00,0xff,0x00,0xff,  0x40,0x40,0x40,0xff,  0x00,0xff,0x00,0xff,  0x40,0x40,0x40,0xff,  0x00,0xff,0x00,0xff,
+        0x00,0x00,0x00,0xff,  0x00,0x00,0xff,0xff,  0x00,0x00,0x00,0xff,  0x00,0x00,0xff,0xff,  0x00,0x00,0x00,0xff,  0x00,0x00,0xff,0xff
+    };
+    /*
     const unsigned char imgData[bytes] = {
         0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0xff,
         0x40,0x40,0x40,0xff,  0x00,0xff,0x00,0xff,
         0x00,0x00,0x00,0xff,  0x00,0x00,0xff,0xff
     };
+    */
     unsigned char *imgOut = (unsigned char *)malloc(bytes);
 
     // allocate memory for each vector on host
@@ -237,21 +251,31 @@ int main()
     err |= clEnqueueWriteBuffer(queue, d_b, CL_TRUE, 0,
                                    bytes, h_b, 0, NULL, NULL);
     */
+
+    // create sampler for sampling the input image
+    cl_sampler sampler = clCreateSampler(
+        context,
+        CL_TRUE,                    // Non-normalized coordinates
+        CL_ADDRESS_CLAMP_TO_EDGE,
+        CL_FILTER_NEAREST,
+        &err);
  
     // Set the arguments to our compute kernel
     err |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputImg);
     err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputImg);
+    err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &sampler);
     // sizeof(cl_sampler)
 
     CHECK_ERROR(err);
 
     // size_t localWorkSize[2] = { 16, 16 };
     // size_t globalWorkSize[2] = { RoundUp(localWorkSize[0], width), RoundUp(localWorkSize[1], height) };
+    size_t localWorkSize[2] = { 1, 1 };
     size_t globalWorkSize[2] = { width, height }; // ceil(width/localWorkSize[0])*localWorkSize, ...
 
     // Execute the kernel over the entire range of the data set
     cl_event kernelDoneEvt;
-    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, globalWorkSize, NULL,
+    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, globalWorkSize, localWorkSize,
                                  0, NULL, &kernelDoneEvt);
 
 
@@ -294,7 +318,12 @@ int main()
     for (unsigned int i = 0; i < bytes; i++)
     {
         //printf("#%02x%02x%02x%02x ", imgOut[i], imgOut[i+1], imgOut[i+2], imgOut[i+3]);
-        printf("%02x ", imgOut[i]);
+        printf("%02x", imgOut[i]);
+        if ((i+1) % 8*width == 0)
+            printf("\n");
+        else if ((i+1) % 4*width == 0)
+            printf(" ");
+
     }
     printf("\n");
 
