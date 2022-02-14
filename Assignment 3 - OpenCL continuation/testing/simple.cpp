@@ -1,6 +1,8 @@
 #define CL_USE_DEPRECATED_OPENCL_2_0_APIS // required for using olf APIs
 
 #include <windows.h>
+#include <iostream>
+#include <vector>
 #include <CL/cl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -106,7 +108,7 @@ cl_int displayDeviceInfo(cl_device_id device)
 
 // OpenCL kernel. Each work item takes care of one element of C.
 const char *kernelSource = "\n" \
-"__kernel void add_matrix(__read_only image2d_t in,                           \n" \
+"__kernel void pixel_stuff(__read_only image2d_t in,                          \n" \
 "                         __write_only image2d_t out,                         \n" \
 "                         sampler_t sampler)                                  \n" \
 "{                                                                            \n" \
@@ -115,12 +117,11 @@ const char *kernelSource = "\n" \
 "                                                                             \n" \
 "    /*c[id] = a[id] + b[id];*/                                               \n" \
 "    //float4 clr = (0.5f, 0.5f, 0.5f, 0.5f);                                 \n" \
-"    int2 coord = (get_global_id(0), get_global_id(1));                       \n" \
+"    int2 coord = (int2)(get_global_id(0), get_global_id(1));                 \n" \
 "    float4 clr = read_imagef(in, sampler, coord);                            \n" \
 "                                                                             \n" \
-"    write_imagef(out, coord, (float4)(coord[0]/2.0f, coord[1]/3.0f, 1.0f,1.0f));               \n" \
-"    // write_imagef(out, coord, (float4)(0.25f,0.5f,0.75f,1.0f));               \n" \
-"    // write_imagef(out, coord, clr);                                           \n" \
+"    // write_imagef(out, coord, (float4)((coord[0]+1)/6.0f, (coord[1]+1)/3.0f,0.75f,1.0f));               \n" \
+"    write_imagef(out, coord, clr);                                           \n" \
 "}                                                                            \n" \
 "\n";
 
@@ -128,9 +129,6 @@ int main()
 {
     cl_int err;
 
-    // size of a side of the matrices (N*N)
-    unsigned int N = 10;
- 
     // device (image) buffers
     cl_mem inputImg;
     cl_mem outputImg;
@@ -142,22 +140,25 @@ int main()
     cl_program program;                 // program
     cl_kernel kernel;                   // kernel
 
-    size_t width = 6;
+    // image dimensions
+    size_t width = 2;
     size_t height = 3;
     size_t bytes = 4 * width * height;
 
-    const unsigned char imgData[bytes] = {
+    /*
+    const unsigned char imgArr[bytes] = {
         0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0xff,  0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0xff,  0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0xff,
         0x40,0x40,0x40,0xff,  0x00,0xff,0x00,0xff,  0x40,0x40,0x40,0xff,  0x00,0xff,0x00,0xff,  0x40,0x40,0x40,0xff,  0x00,0xff,0x00,0xff,
         0x00,0x00,0x00,0xff,  0x00,0x00,0xff,0xff,  0x00,0x00,0x00,0xff,  0x00,0x00,0xff,0xff,  0x00,0x00,0x00,0xff,  0x00,0x00,0xff,0xff
     };
-    /*
-    const unsigned char imgData[bytes] = {
+    */
+    const unsigned char imgArr[bytes] = {
         0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0xff,
         0x40,0x40,0x40,0xff,  0x00,0xff,0x00,0xff,
         0x00,0x00,0x00,0xff,  0x00,0x00,0xff,0xff
     };
-    */
+    std::vector <unsigned char> imgData(imgArr, imgArr + bytes);
+
     unsigned char *imgOut = (unsigned char *)malloc(bytes);
 
     // allocate memory for each vector on host
@@ -183,35 +184,35 @@ int main()
     queue = clCreateCommandQueue(context, device_id, CL_QUEUE_PROFILING_ENABLE, &err);
  
     // create the compute program from the source buffer
-    program = clCreateProgramWithSource(context, 1,
-                            (const char **)&kernelSource, NULL, &err);
+    program = clCreateProgramWithSource(context, 1, (const char **)&kernelSource, NULL, &err);
  
     // build the program executable 
     clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
     CHECK_ERROR(err);
  
     // create the compute kernel in the program we wish to run
-    kernel = clCreateKernel(program, "add_matrix", &err);
+    kernel = clCreateKernel(program, "pixel_stuff", &err);
 
+    // Pixel format: RGBA, each pixel channel is unsigned 8-bit integer
     static const cl_image_format imgFormat = { CL_RGBA, CL_UNORM_INT8 };
     static const cl_image_desc imgDesc = {
-        CL_MEM_OBJECT_IMAGE2D,      // cl_mem_object_type image_type;
-        width,                      // size_t image_width;
-        height,                     // size_t image_height;
-        0,                          // size_t image_depth;
-        0,                          // size_t image_array_size;
-        0,                          // size_t image_row_pitch; 0 = calculated automatically
-        0,                          // size_t image_slice_pitch; 0 = calculated automatically
-        0,                          // cl_uint num_mip_levels;
-        0,                          // cl_uint num_samples;
-        NULL                        // cl_mem buffer;
+        CL_MEM_OBJECT_IMAGE2D,                      // cl_mem_object_type image_type
+        width,                                      // size_t image_width
+        height,                                     // size_t image_height
+        0,                                          // size_t image_depth
+        0,                                          // size_t image_array_size
+        0,                                          // size_t image_row_pitch; 0 => calculated automatically
+        0,                                          // size_t image_slice_pitch; 0 => calculated automatically
+        0,                                          // cl_uint num_mip_levels
+        0,                                          // cl_uint num_samples
+        NULL                                        // cl_mem buffer
     };
     inputImg = clCreateImage(
         context,
-        CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-        &imgFormat,
-        &imgDesc,
-        (void *)imgData,
+        CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,    // host can only read this image
+        &imgFormat,                                 // image (array) format
+        &imgDesc,                                   // image description
+        static_cast<void*>(imgData.data()),         // the image data is sourced from here
         &err);
     outputImg = clCreateImage(
         context,
@@ -227,20 +228,23 @@ int main()
     // d_in = clCreateBuffer(context, CL_MEM_READ_ONLY, bytes, NULL, NULL);
     // d_out = clCreateBuffer(context, CL_MEM_WRITE_ONLY, bytes, NULL, NULL);
 
-    size_t origin[] = {0,0,0};        
+    size_t origin[] = {0,0,0};
     size_t region[] = {width, height, 1};
+#if 0
+    // NOTE: This is not necessary if CL_MEM_COPY_HOST_PTR is used!
     err |= clEnqueueWriteImage(
-        queue,                      // cl_command_queue command_queue
-        inputImg,                   // cl_mem image
-        CL_TRUE,                    // cl_bool blocking_write 
-        origin,                     // const size_t *origin[3]
-        region,                     // const size_t *region[3]
-        0,                          // size_t input_row_pitch
-        0,                          // size_t input_slice_pitch
-        imgData,                    // const void *ptr
-        0,                          // cl_uint num_events_in_wait_list
-        NULL,                       // const cl_eventevent_wait_list
-        NULL);                      // cl_event *event
+        queue,                                  // cl_command_queue command_queue
+        inputImg,                               // cl_mem image
+        CL_TRUE,                                // cl_bool blocking_write
+        origin,                                 // const size_t *origin[3]
+        region,                                 // const size_t *region[3]
+        0,                                      // size_t input_row_pitch
+        0,                                      // size_t input_slice_pitch
+        static_cast<void*>(imgData.data()),     // const void *ptr
+        0,                                      // cl_uint num_events_in_wait_list
+        NULL,                                   // const cl_eventevent_wait_list
+        NULL);                                  // cl_event *event
+#endif
  
     CHECK_ERROR(err);
 
@@ -255,29 +259,30 @@ int main()
     // create sampler for sampling the input image
     cl_sampler sampler = clCreateSampler(
         context,
-        CL_TRUE,                    // Non-normalized coordinates
-        CL_ADDRESS_CLAMP_TO_EDGE,
-        CL_FILTER_NEAREST,
+        CL_FALSE,                               // Coordinate system; non-normalized
+        CL_ADDRESS_CLAMP_TO_EDGE,               // Disallow sampling over the edge
+        CL_FILTER_NEAREST,                      // Take the nearest true pixel value
         &err);
  
     // Set the arguments to our compute kernel
     err |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputImg);
     err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputImg);
-    err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &sampler);
-    // sizeof(cl_sampler)
+    err |= clSetKernelArg(kernel, 2, sizeof(cl_sampler), &sampler);
 
     CHECK_ERROR(err);
 
     // size_t localWorkSize[2] = { 16, 16 };
     // size_t globalWorkSize[2] = { RoundUp(localWorkSize[0], width), RoundUp(localWorkSize[1], height) };
-    size_t localWorkSize[2] = { 1, 1 };
-    size_t globalWorkSize[2] = { width, height }; // ceil(width/localWorkSize[0])*localWorkSize, ...
+    size_t localWorkSize[2] = { 16, 16 }; // 16*16 => 256
+    size_t globalWorkSize[2] = {
+        (size_t)ceil(width/(float)localWorkSize[0]) * localWorkSize[0],
+        (size_t)ceil(height/(float)localWorkSize[1]) * localWorkSize[1]
+    };
 
     // Execute the kernel over the entire range of the data set
     cl_event kernelDoneEvt;
     err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, globalWorkSize, localWorkSize,
                                  0, NULL, &kernelDoneEvt);
-
 
     // wait for the kernel to finish
     clWaitForEvents(1, &kernelDoneEvt);
@@ -292,7 +297,6 @@ int main()
     clGetEventProfilingInfo(kernelDoneEvt, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
 
     // display information
-    printf("Sum two %dx%d matrices using OpenCL on %s.\n", N, N, TARGET_DEVICE_TYPE == CL_DEVICE_TYPE_GPU ? "GPU" : "CPU");
     err = displayDeviceInfo(device_id);
     double microSeconds = (time_end - time_start)/1000.0;
     printf("Execution time: %0.3f us \n", microSeconds);
@@ -319,9 +323,9 @@ int main()
     {
         //printf("#%02x%02x%02x%02x ", imgOut[i], imgOut[i+1], imgOut[i+2], imgOut[i+3]);
         printf("%02x", imgOut[i]);
-        if ((i+1) % 8*width == 0)
+        if ((i+1) % (4*width) == 0)
             printf("\n");
-        else if ((i+1) % 4*width == 0)
+        else if ((i+1) % 4 == 0)
             printf(" ");
 
     }
