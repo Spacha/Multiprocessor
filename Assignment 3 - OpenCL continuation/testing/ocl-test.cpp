@@ -63,7 +63,7 @@ const char *kernelSource = "\n" \
 "    /*c[id] = a[id] + b[id];*/                                               \n" \
 "    //float4 clr = (0.5f, 0.5f, 0.5f, 0.5f);                                 \n" \
 "    int2 coord = (int2)(get_global_id(0), get_global_id(1));                 \n" \
-"    //float4 clr = read_imagef(in, sampler, coord);                            \n" \
+"    float4 clr = read_imagef(in, sampler, coord);                            \n" \
 "                                                                             \n" \
 "    // write_imagef(out, coord, (float4)((coord[0]+1)/6.0f, (coord[1]+1)/3.0f,0.75f,1.0f));               \n" \
 "    write_imagef(out, coord, clr);                                           \n" \
