@@ -44,6 +44,41 @@ using std::endl;
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
+// GLOBAL VARIABLES
+///////////////////////////////////////////////////////////////////////////////
+
+// See OpenCL Programming Guide p.342.
+// OpenCL kernel. Each work item takes care of one element of C.
+
+const char *kernelSource = "\n" \
+"__constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE |                 \n" \
+"                               CLK_ADDRESS_CLAMP_TO_EDGE   |                 \n" \
+"                               CLK_FILTER_NEAREST;                           \n" \
+"__kernel void RGBA2grayscale(__read_only image2d_t in,                       \n" \
+"                         __write_only image2d_t out)                         \n" \
+"{                                                                            \n" \
+"    // get our global thread ID                                              \n" \
+"    int id = (get_global_id(1) * get_global_size(0)) + get_global_id(0);     \n" \
+"                                                                             \n" \
+"    /*c[id] = a[id] + b[id];*/                                               \n" \
+"    //float4 clr = (0.5f, 0.5f, 0.5f, 0.5f);                                 \n" \
+"    int2 coord = (int2)(get_global_id(0), get_global_id(1));                 \n" \
+"    //float4 clr = read_imagef(in, sampler, coord);                            \n" \
+"                                                                             \n" \
+"    // write_imagef(out, coord, (float4)((coord[0]+1)/6.0f, (coord[1]+1)/3.0f,0.75f,1.0f));               \n" \
+"    write_imagef(out, coord, clr);                                           \n" \
+"}                                                                            \n" \
+"\n";
+
+// Mean filter (5x5)
+const size_t maskSize = 5;
+const float mask[maskSize*maskSize] = { // 0.04 = 1/25 = 1/(5*5)
+	0.04f, 0.04f, 0.04f, 0.04f, 0.04f,
+	0.04f, 0.04f, 0.04f, 0.04f, 0.04f,
+	0.04f, 0.04f, 0.04f, 0.04f, 0.04f
+};
+
+///////////////////////////////////////////////////////////////////////////////
 // HELPER FUNCTIONS
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -148,8 +183,8 @@ class Image
 public:
     std::vector<unsigned char> image;   // image pixels (RGBA)
     std::string name;                   // image file name
-    unsigned int height;                // image height
-    unsigned int width;                 // image width
+    size_t width;                 		// image width
+    size_t height;                		// image height
     LodePNGColorType colorType;         // color type (see LodePNGColorType in lodepng.h)
     MiniOCL *ocl = nullptr;				// Handle to OpenCL wrapper class for parallel execution
 
@@ -204,7 +239,8 @@ public:
         }
 
         cout << "Decoding image... ";
-        err = lodepng::decode(this->image, this->width, this->height, png);
+        err = lodepng::decode(this->image,
+        	(unsigned &)this->width, (unsigned &)this->height, png);
         cout << "Done." << endl;
 
         // the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA...
@@ -229,7 +265,8 @@ public:
         std::vector<unsigned char> png;
 
         cout << "Encoding image... ";
-        err = lodepng::encode(png, this->image, this->width, this->height);
+        err = lodepng::encode(png, this->image,
+        	(unsigned)this->width, (unsigned)this->height);
         cout << "Done." << endl;
 
         if (err) {
@@ -255,7 +292,19 @@ public:
      **/
     bool convertToGrayscale()
     {
+    	bool success = true;
         cout << "Transforming image to grayscale... ";
+
+        std::string name = "RGBA2grayscale";
+        success = this->ocl->buildKernel(&name, &kernelSource);
+
+        success = this->ocl->setImageBuffers(
+        	static_cast<void *>(this->image.data()), // input image
+        	static_cast<void *>(this->image.data()), // output image (overwrite)
+        	width,
+        	height);
+
+        success = this->ocl->executeKernel(16, 16);
 
 #ifdef USE_OCL /* OpenCL (GPU or CPU) */
 
@@ -291,7 +340,7 @@ public:
 #endif
 
         cout << "Done." << endl;
-        return true;
+        return success;
     }
 
     /**
@@ -369,13 +418,6 @@ public:
 * MAIN
 ******************************************************************************/
 
-const size_t maskSize = 5;
-const float mask[maskSize*maskSize] = { // 0.04 = 1/25 = 1/(5*5)
-	0.04f, 0.04f, 0.04f, 0.04f, 0.04f,
-	0.04f, 0.04f, 0.04f, 0.04f, 0.04f,
-	0.04f, 0.04f, 0.04f, 0.04f, 0.04f
-};
-
 int main()
 {
 	bool success;
@@ -391,7 +433,8 @@ int main()
 
 #ifdef USE_OCL
 	// initialize OpenCL if necessary
-	MiniOCL ocl(TARGET_DEVICE_TYPE);
+	MiniOCL ocl;
+	ocl.initialize(TARGET_DEVICE_TYPE);
 	img.setOpenCL(&ocl);
 
 	ocl.displayDeviceInfo();
@@ -409,6 +452,10 @@ int main()
 	success = img.convertToGrayscale();
 	ptimer.printTime();
 	CHECK_ERROR(success, "Error transforming image to grayscale.")
+
+	// print the actual kernel execution time
+	double microSeconds = ocl.getExecutionTime();
+    printf("\t=> Kernel execution time: %0.3f us \n", microSeconds);
 
 	ptimer.reset();
 	success = img.save("gray.png");

@@ -174,13 +174,13 @@ int main()
     // bind to platform
     err = clGetPlatformIDs(1, &platform, NULL);
  
-    // get ID for the device
+    // get ID for the device (currently takes the first device automatically)
     err = clGetDeviceIDs(platform, TARGET_DEVICE_TYPE, 1, &device_id, NULL);
  
-    // create a context  
+    // create a context
     context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
  
-    // create a command queue 
+    // create a command queue
     queue = clCreateCommandQueue(context, device_id, CL_QUEUE_PROFILING_ENABLE, &err);
  
     // create the compute program from the source buffer
