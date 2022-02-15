@@ -40,7 +40,7 @@ bool MiniOCL::initialize(cl_device_type device_type)
     return err == CL_SUCCESS;
 }
 
-bool MiniOCL::buildKernel(std::string *name, const char **source)
+bool MiniOCL::buildKernel(const std::string *name, const char **source)
 {
     cl_int err = CL_SUCCESS;
 
@@ -54,7 +54,6 @@ bool MiniOCL::buildKernel(std::string *name, const char **source)
     clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
 
     // create the compute kernel in the program we wish to run
-    // const char *constName = kernelName;
     kernel = clCreateKernel(program, kernelName.c_str(), &err);
 
     return err == CL_SUCCESS;

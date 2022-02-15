@@ -38,7 +38,7 @@ class MiniOCL
 public:
 	MiniOCL();
 	bool initialize(cl_device_type device_type);
-	bool buildKernel(std::string *name, const char **source);
+	bool buildKernel(const std::string *name, const char **source);
 	bool setWorkGroupSize(size_t localWidth, size_t localHeight);
 	bool setImageBuffers(void *in, void *out, size_t width, size_t height);
 	bool executeKernel(size_t localWidth, size_t localHeight);
