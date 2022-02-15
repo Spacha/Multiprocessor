@@ -26,7 +26,7 @@ using std::endl;
 // Parameters:
 ///////////////////////////////////////////////////////////////////////////////
 
-#define COMPUTE_DEVICE TARGET_NONE 		// TARGET_NONE / TARGET_GPU / TARGET_CPU
+#define COMPUTE_DEVICE TARGET_GPU      // TARGET_NONE / TARGET_GPU / TARGET_CPU
 
 ///////////////////////////////////////////////////////////////////////////////
 // DEFINITIONS & MACROS
@@ -34,17 +34,17 @@ using std::endl;
 
 struct filter_s
 {
-	const size_t size; 		// size of the mask (height or width)
-	const float factor; 	// the mask is multiplied by this
-	const float *mask; 		// the actual filter mask
+    const size_t size;      // size of the mask (height or width)
+    const float factor;     // the mask is multiplied by this
+    const float *mask;      // the actual filter mask
 };
 typedef struct filter_s filter_t;
 
-#define CHECK_ERROR(success, msg) 							\
-	if (!success) {				  							\
-		cout << msg << endl;								\
-		return EXIT_FAILURE;						 		\
-	}
+#define CHECK_ERROR(success, msg)                           \
+    if (!success) {                                         \
+        cout << msg << endl;                                \
+        return EXIT_FAILURE;                                \
+    }
 
 #if COMPUTE_DEVICE == TARGET_CPU
 # define TARGET_DEVICE_TYPE CL_DEVICE_TYPE_CPU
@@ -63,7 +63,7 @@ typedef struct filter_s filter_t;
 // See OpenCL Programming Guide p.342.
 // OpenCL kernel. Each work item takes care of one element of C.
 
-const char *kernelSource = "\n" \
+const char *ksGrayscale = "\n" \
 "__constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE |                 \n" \
 "                               CLK_ADDRESS_CLAMP_TO_EDGE   |                 \n" \
 "                               CLK_FILTER_NEAREST;                           \n" \
@@ -79,6 +79,52 @@ const char *kernelSource = "\n" \
 "}                                                                            \n" \
 "\n";
 
+
+
+const char *ksFilter = "\n" \
+"__constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE |                 \n" \
+"                               CLK_ADDRESS_CLAMP_TO_EDGE   |                 \n" \
+"                               CLK_FILTER_NEAREST;                           \n" \
+"__kernel void filter(__read_only image2d_t in,                               \n" \
+"                     __write_only image2d_t out,                             \n" \
+"                     __read_only float *mask,                                \n" \
+"                     const unsigned int maskSize)                            \n" \
+"{                                                                            \n" \
+"}                                                                            \n" \
+"\n";
+#if 0
+,                                            \n" \
+"                     float factor,                                           \n" \
+"                     int maskSize
+
+"    int d = maskSize / 2;                                                    \n" \
+"    int2 center = (get_global_id(0), get_global_id(0));                      \n" \
+"    int2 topLeft = center - d;                                               \n" \
+"    int2 btRight = center + d;                                               \n" \
+"                                                                             \n" \
+"    if (center.x < width && center.y < height)                               \n" \
+"    {                                                                        \n" \
+"        int weight = 0;                                                      \n" \
+"        float4 newClr = (float4)(0.0f, 0.0f, 0.0f, 0.0f);                    \n" \
+"                                                                             \n" \
+"        // iterate over each element in the mask                             \n" \
+"        for (int y = topLeft.y; y <= btRight.y; y++)                         \n" \
+"        {                                                                    \n" \
+"            for (int x = topLeft.x; x <= btRight.x; x++)                     \n" \
+"            {                                                                \n" \
+"                newClr += (read_imagef(in, sampler, (int2)(x, y)) *          \n" \
+"                    mask[weight] * factor);                                  \n" \
+"                                                                             \n" \
+"                weight += 1;                                                 \n" \
+"            }                                                                \n" \
+"        }                                                                    \n" \
+"                                                                             \n" \
+"        write_imagef(out, center, newClr);                                   \n" \
+"    }                                                                        \n" \
+
+#endif
+
+
 ///////////////////////////////////////////////////////////////////////////////
 // FILTERS
 ///////////////////////////////////////////////////////////////////////////////
@@ -87,30 +133,30 @@ const size_t maskSize = 5;
 
 // Mean/averaging filter (5x5)
 const float meanFilterMask[maskSize*maskSize] = { // 0.04 = 1/25 = 1/(5*5)
-	1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-	1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-	1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-	1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-	1.0f, 1.0f, 1.0f, 1.0f, 1.0f
+    1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f, 1.0f, 1.0f
 };
 const filter_t meanFilter = {
-	.size = maskSize,
-	.factor = 1/25.0f,
-	.mask = meanFilterMask
+    .size = maskSize,
+    .factor = 1/25.0f,
+    .mask = meanFilterMask
 };
 
 // Gaussian filter (5x5)
 const float gaussianFilterMask[maskSize*maskSize] = {
-	 1.0f,  4.0f,  7.0f,  4.0f,  1.0f,
-	 4.0f, 16.0f, 26.0f, 16.0f,  4.0f,
-	 7.0f, 26.0f, 41.0f, 26.0f,  7.0f,
-	 4.0f, 16.0f, 26.0f, 16.0f,  4.0f,
-	 1.0f,  4.0f,  7.0f,  4.0f,  1.0f
+     1.0f,  4.0f,  7.0f,  4.0f,  1.0f,
+     4.0f, 16.0f, 26.0f, 16.0f,  4.0f,
+     7.0f, 26.0f, 41.0f, 26.0f,  7.0f,
+     4.0f, 16.0f, 26.0f, 16.0f,  4.0f,
+     1.0f,  4.0f,  7.0f,  4.0f,  1.0f
 };
 const filter_t gaussianFilter = {
-	.size = maskSize,
-	.factor = 1/273.0f,
-	.mask = gaussianFilterMask
+    .size = maskSize,
+    .factor = 1/273.0f,
+    .mask = gaussianFilterMask
 };
 
 
@@ -175,23 +221,23 @@ public:
      **/
     void printTime()
     {
-    	double delta_us = this->getMicroseconds();
+        double delta_us = this->getMicroseconds();
 
-    	std::string unitsStr;
-    	double divisor;
+        std::string unitsStr;
+        double divisor;
 
-    	if (delta_us < 1000) { 				// microseconds
-			unitsStr = "us";
-    		divisor = 1;
-    	} else if (delta_us < 1000000) {	// milliseconds
-			unitsStr = "ms";
-    		divisor = 1000;
-    	} else {
-    		unitsStr = "s"; 				// seconds
-    		divisor = 1000000;
-    	}
+        if (delta_us < 1000) {              // microseconds
+            unitsStr = "us";
+            divisor = 1;
+        } else if (delta_us < 1000000) {    // milliseconds
+            unitsStr = "ms";
+            divisor = 1000;
+        } else {
+            unitsStr = "s";                 // seconds
+            divisor = 1000000;
+        }
 
-    	printf("\t=> time: %0.3f %s\n", delta_us/divisor, unitsStr.c_str());
+        printf("\t=> time: %0.3f %s\n", delta_us/divisor, unitsStr.c_str());
     }
 };
 
@@ -223,21 +269,21 @@ typedef struct pixelf_s pixelf_t;
 
 pixel_t pixelf_to_pixel(pixelf_t p)
 {
-	return {
-		(unsigned char)(255.0f * p.red),
-		(unsigned char)(255.0f * p.green),
-		(unsigned char)(255.0f * p.blue),
-		(unsigned char)(255.0f * p.alpha)
-	};
+    return {
+        (unsigned char)(255.0f * p.red),
+        (unsigned char)(255.0f * p.green),
+        (unsigned char)(255.0f * p.blue),
+        (unsigned char)(255.0f * p.alpha)
+    };
 }
 pixelf_t pixel_to_pixelf(pixel_t p)
 {
-	return {
-		(float)(  p.red / 255.0f),
-		(float)(p.green / 255.0f),
-		(float)( p.blue / 255.0f),
-		(float)(p.alpha / 255.0f)
-	};
+    return {
+        (float)(  p.red / 255.0f),
+        (float)(p.green / 255.0f),
+        (float)( p.blue / 255.0f),
+        (float)(p.alpha / 255.0f)
+    };
 }
 
 
@@ -251,10 +297,10 @@ class Image
 public:
     std::vector<unsigned char> image;   // image pixels (RGBA)
     std::string name;                   // image file name
-    size_t width;                 		// image width
-    size_t height;                		// image height
+    size_t width;                       // image width
+    size_t height;                      // image height
     LodePNGColorType colorType;         // color type (see LodePNGColorType in lodepng.h)
-    MiniOCL *ocl = nullptr;				// Handle to OpenCL wrapper class for parallel execution
+    MiniOCL *ocl = nullptr;             // Handle to OpenCL wrapper class for parallel execution
 
     /**
      * Initializes the object and sets color type
@@ -270,7 +316,7 @@ public:
      **/
     void setOpenCL(MiniOCL *ocl)
     {
-    	this->ocl = ocl;
+        this->ocl = ocl;
     }
 
     /**
@@ -282,7 +328,21 @@ public:
         this->height = height;
 
         this->image.clear();
-        this->image.reserve(4 * this->width * this->height);
+        this->image.resize(4 * this->width * this->height, (unsigned char)0);
+    }
+
+    /**
+     * Replaces the current image with given.
+     **/
+    void replaceImage(std::vector<unsigned char> &newImage)
+    {
+        // can only replace with image of same size
+        if (newImage.size() != this->image.size())
+            throw;
+
+        // this->image <-- newImage[begin, end]
+        // this->image.clear();
+        std::move(newImage.begin(), newImage.end(), this->image.begin());
     }
 
     /**
@@ -308,7 +368,7 @@ public:
 
         cout << "Decoding image... ";
         err = lodepng::decode(this->image,
-        	(unsigned &)this->width, (unsigned &)this->height, png);
+            (unsigned &)this->width, (unsigned &)this->height, png);
         cout << "Done." << endl;
 
         // the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA...
@@ -334,7 +394,7 @@ public:
 
         cout << "Encoding image... ";
         err = lodepng::encode(png, this->image,
-        	(unsigned)this->width, (unsigned)this->height);
+            (unsigned)this->width, (unsigned)this->height);
         cout << "Done." << endl;
 
         if (err) {
@@ -360,24 +420,24 @@ public:
      **/
     bool convertToGrayscale()
     {
-    	bool success = true;
+        bool success = true;
         cout << "Transforming image to grayscale... ";
 
 #ifdef USE_OCL /* OpenCL (GPU or CPU) */
 
         // cout << "Kernel execution time: " << microSeconds << endl;
         if (!this->ocl) {
-        	cout << "Cannot do parallel execution without instance of MiniOCL." << endl;
-        	return false;
+            cout << "Cannot do parallel execution without instance of MiniOCL." << endl;
+            return false;
         }
 
-        const std::string kernerlName = "RGBA2grayscale";
-        success = this->ocl->buildKernel(&name, &kernelSource);
+        const std::string kernelName = "RGBA2grayscale";
+        success = this->ocl->buildKernel(&kernelName, &ksGrayscale);
         success = this->ocl->setImageBuffers(
-        	static_cast<void *>(this->image.data()), // input image
-        	static_cast<void *>(this->image.data()), // output image (overwrite)
-        	width,
-        	height);
+            static_cast<void *>(this->image.data()), // input image
+            static_cast<void *>(this->image.data()), // output image (overwrite)
+            width,
+            height);
 
         success = this->ocl->executeKernel(16, 16);
 
@@ -390,10 +450,9 @@ public:
                 pixel_t p = this->getPixel(x, y);
 
                 // replace the pixel with a gray one
-				this->putPixel(x, y, ceil(0.299*p.red + 0.587*p.green + 0.114*p.blue));
+                this->putPixel(x, y, ceil(0.299*p.red + 0.587*p.green + 0.114*p.blue));
             }
         }
-
 
 #endif
 
@@ -407,28 +466,45 @@ public:
      **/
     bool filter(const filter_t &filter)
     {
+        bool success = true;
         cout << "Filtering image using a mask... ";
 
         // the mask size must be odd
         if (filter.size % 2 == 0) {
-        	cout << "Error: mask size is not odd." << endl;
-        	return false;
-        }
-
-        float weights[filter.size * filter.size];
-
-        // precalculation for better performance;
-        // multiply the mask weights by the factor here
-        for (int i = 0; i < (int)(filter.size * filter.size); i++)
-        {
-        	weights[i] = filter.factor * filter.mask[i];
+            cout << "Error: mask size is not odd." << endl;
+            return false;
         }
 
 #ifdef USE_OCL /* OpenCL (GPU or CPU) */
 
-        // ...
+        if (!this->ocl) {
+            cout << "Cannot do parallel execution without instance of MiniOCL." << endl;
+            return false;
+        }
+
+        // *in, *out, *mask, maskSize, factor
+        const std::string kernelName = "filter";
+        this->ocl->buildKernel(&kernelName, &ksFilter);
+        this->ocl->setImageBuffers(
+            static_cast<void *>(this->image.data()), // input image
+            static_cast<void *>(this->image.data()), // output image (overwrite)
+            width,
+            height);
+#if 0
+        this->ocl->setInputBuffer(&filter.mask, sizeof(float) * filter.size * filter.size);
+        this->ocl->setArg(&filter.size, sizeof(size_t));
+        this->ocl->setArg(&filter.factor, sizeof(float));
+#endif
+
+
+        success = this->ocl->executeKernel(16, 16);
 
 #else /* No parallelization */
+
+        // temporary image where the filtered image will be
+        // std::vector<unsigned char> tempImage(4 * width * height);
+        Image tempImage;
+        tempImage.createEmpty(width, height);
 
         int d = filter.size / 2; // mask's "edge thickness"
 
@@ -436,45 +512,50 @@ public:
         {
             for (unsigned int cx = 0; cx < width; cx++)
             {
-            	unsigned int weight = 0;
-            	pixelf_t newColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+                unsigned int weight = 0;
+                pixelf_t newClr = { 0.0f, 0.0f, 0.0f, 255.0f };
 
-            	// iterate over each element in the mask
-            	for (int y = cy - d; y <= (int)(cy + d); y++)
-            	{
-            		for (int x = cx - d; x <= (int)(cx + d); x++)
-            		{
-		                pixelf_t p = validCoordinates(x, y)
-		                	? pixel_to_pixelf( this->getPixel(x, y) )
-		                	: (pixelf_t){ 0.0f, 0.0f, 0.0f, 0.0f };
+                // iterate over each element in the mask
+                for (int y = cy - d; y <= (int)(cy + d); y++)
+                {
+                    for (int x = cx - d; x <= (int)(cx + d); x++)
+                    {
+                        // get pixel if within image
+                        pixel_t p = validCoordinates(x, y)
+                            ? this->getPixel(x, y)
+                            : (pixel_t){ 0, 0, 0, 0 };
 
+                        newClr.red   += filter.mask[weight] * (float)p.red;
+                        newClr.green += filter.mask[weight] * (float)p.green;
+                        newClr.blue  += filter.mask[weight] * (float)p.blue;
+                        weight++;
+                    }
+                }
+                // cout << "\t(" << cx << "," << cy << ") " << newClr.red << " -> ";
+                pixel_t pixelInt = {
+                    (unsigned char)(filter.factor * newClr.red),
+                    (unsigned char)(filter.factor * newClr.green),
+                    (unsigned char)(filter.factor * newClr.blue),
+                    (unsigned char)(newClr.alpha)
+                };
+                // cout << (unsigned int)newClr.red << endl;
 
-		                newColor.red   += weights[weight] * p.red;
-		                newColor.green += weights[weight] * p.green;
-		                newColor.blue  += weights[weight] * p.blue;
-
-		                cout << "\t(" << x << "," << y << ") " << newColor.red << endl;
-
-		                weight++;
-		            }
-	            }
-
-	            pixel_t pu = (pixel_t)pixelf_to_pixel(newColor);
-	            cout << newColor.red  << "," << newColor.green  << "," << newColor.blue  << " -> "
-	                 << (float)pu.red << "," << (float)pu.green << "," << (float)pu.blue << endl;
-
-	            // replace the pixel in the center of the mask
-	            this->putPixel(cx, cy, pixelf_to_pixel(newColor));
+                // replace the pixel in the center of the mask
+                tempImage.putPixel(cx, cy, pixelInt);
+                // cout << (unsigned int)pixelInt.red  << "," << (unsigned int)pixelInt.green  << "," << (unsigned int)pixelInt.blue  << endl;
             }
         }
+
+        // update the image
+        this->replaceImage(tempImage.image);
 
 #endif
 
         cout << "Done." << endl;
-        return true;
+        return success;
     }
 
-	/**
+    /**
      * Puts given RGBA (4 channel) pixel to position (x,y).
      **/
     void putPixel(unsigned int x, unsigned int y, pixel_t pixel)
@@ -504,7 +585,7 @@ public:
      **/
     pixel_t getPixel(unsigned int x, unsigned int y)
     {
-    	if (!validCoordinates(x, y))
+        if (!validCoordinates(x, y))
             throw;
 
         // RGBA
@@ -512,13 +593,13 @@ public:
         return { image[i], image[i+1], image[i+2], image[i+3] };
     }
 
-	/**
-	 * Returns true if given coordinates point to
-	 * a pixel coordinate, otherwise false.
-	 **/
+    /**
+     * Returns true if given coordinates point to
+     * a pixel coordinate, otherwise false.
+     **/
     bool validCoordinates(unsigned int x, unsigned int y)
     {
-    	return !(x > (width-1) || y > (height-1) || x < 0 || y < 0);
+        return !(x > (width-1) || y > (height-1) || x < 0 || y < 0);
     }
 
     /**
@@ -539,61 +620,61 @@ public:
 
 int main()
 {
-	bool success;
-	Image img;
-	PerfTimer ptimer; // used for measuring execution time
+    bool success;
+    Image img;
+    PerfTimer ptimer; // used for measuring execution time
 
-	const std::string imgName = "img/simple.png"; // the image to load from disk
+    const std::string imgName = "img/simple.png"; // the image to load from disk
 
-	// seems to be typically around 100-300 us
-	cout << "NOTE: The execution times include some printing to console." << endl;
-	cout << "Image manipulation is done using " << computeDeviceStr() << "." << endl;
+    // seems to be typically around 100-300 us
+    cout << "NOTE: The execution times include some printing to console." << endl;
+    cout << "Image manipulation is done using " << computeDeviceStr() << "." << endl;
 
 #ifdef USE_OCL
-	// initialize OpenCL if necessary
-	MiniOCL ocl;
-	ocl.initialize(TARGET_DEVICE_TYPE);
-	img.setOpenCL(&ocl);
+    // initialize OpenCL if necessary
+    MiniOCL ocl;
+    ocl.initialize(TARGET_DEVICE_TYPE);
+    img.setOpenCL(&ocl);
 
-	ocl.displayDeviceInfo();
+    ocl.displayDeviceInfo();
 #endif /* USE_OCL */
 
-	// 1. load image from disk
+    // 1. load image from disk
     ptimer.reset();
-	success = img.load(imgName);
-	ptimer.printTime();
-	cout << "Image '" << imgName << "', size "
-	     << img.width << "x" << img.height << "." << endl;
-	CHECK_ERROR(success, "Error loading image from disk.")
+    success = img.load(imgName);
+    ptimer.printTime();
+    cout << "Image '" << imgName << "', size "
+         << img.width << "x" << img.height << "." << endl;
+    CHECK_ERROR(success, "Error loading image from disk.")
 
-	// 2. convert the image to grayscale
-	ptimer.reset();
-	success = img.convertToGrayscale();
-	ptimer.printTime();
-	CHECK_ERROR(success, "Error transforming image to grayscale.")
+    // 2. convert the image to grayscale
+    ptimer.reset();
+    success = img.convertToGrayscale();
+    ptimer.printTime();
+    CHECK_ERROR(success, "Error transforming image to grayscale.")
 
 #ifdef USE_OCL
-	// print the actual kernel execution time
-	double microSeconds = ocl.getExecutionTime();
+    // print the actual kernel execution time
+    double microSeconds = ocl.getExecutionTime();
     printf("\t=> Kernel execution time: %0.3f us \n", microSeconds);
 #endif /* USE_OCL */
 
-	ptimer.reset();
-	success = img.save("img/gray.png");
-	ptimer.printTime();
-	CHECK_ERROR(success, "Error saving image to disk.")
+    ptimer.reset();
+    success = img.save("img/gray.png");
+    ptimer.printTime();
+    CHECK_ERROR(success, "Error saving image to disk.")
 
-	// 3. filter image
-	ptimer.reset();
-	success = img.filter(meanFilter);
-	ptimer.printTime();
-	CHECK_ERROR(success, "Error filtering the image.")
+    // 3. filter image
+    ptimer.reset();
+    success = img.filter(gaussianFilter); // meanFilter / gaussianFilter
+    ptimer.printTime();
+    CHECK_ERROR(success, "Error filtering the image.")
 
-	// 4. save filtered image
-	ptimer.reset();
-	img.save("img/filtered.png");
-	ptimer.printTime();
-	CHECK_ERROR(success, "Error saving the image to disk.")
+    // 4. save filtered image
+    ptimer.reset();
+    img.save("img/filtered.png");
+    ptimer.printTime();
+    CHECK_ERROR(success, "Error saving the image to disk.")
 
-	return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }

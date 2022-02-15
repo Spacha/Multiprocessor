@@ -37,6 +37,8 @@ bool MiniOCL::initialize(cl_device_type device_type)
     queue = clCreateCommandQueueWithProperties(context, device_id, properties, &err);
     // queue = clCreateCommandQueue(context, device_id, CL_QUEUE_PROFILING_ENABLE, &err);
 
+    argIndex = 0;
+
     return err == CL_SUCCESS;
 }
 
@@ -103,6 +105,37 @@ bool MiniOCL::setImageBuffers(void *in, void *out, size_t width, size_t height)
     err |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputBuffer);
     err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputBuffer);
     
+    argIndex += 2;
+
+    return err == CL_SUCCESS;
+}
+
+/**
+ * TODO: Make this (these) more robust and versatile!
+ **/
+bool MiniOCL::setInputBuffer(const void *data, size_t size)
+{
+    cl_int err = CL_SUCCESS;
+
+    buffers.push_back(
+        clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, size, (void *)data, &err)
+    );
+
+    err |= clSetKernelArg(kernel, argIndex, sizeof(cl_mem), buffers.back());
+    argIndex++;
+
+    return err == CL_SUCCESS;
+}
+/**
+ * TODO: Make this (these) more robust and versatile!
+ **/
+bool MiniOCL::setArg(const void *data, size_t size)
+{
+    cl_int err = CL_SUCCESS;
+
+    err |= clSetKernelArg(kernel, argIndex, size, data);
+    argIndex++;
+
     return err == CL_SUCCESS;
 }
 
@@ -142,6 +175,8 @@ bool MiniOCL::executeKernel(size_t localWidth, size_t localHeight)
         0,                          // cl_uint num_events_in_wait_list
         NULL,                       // const cl_eventevent_wait_list
         NULL);                      // cl_event *event
+
+    cout << err << endl;
 
     return err == CL_SUCCESS;
 }
@@ -223,6 +258,19 @@ double MiniOCL::getExecutionTime()
     clGetEventProfilingInfo(kernelEvent, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
 
     return (time_end - time_start)/1000.0;
+}
+
+cl_context MiniOCL::getContext()
+{
+    return context;
+}
+cl_command_queue MiniOCL::getQueue()
+{
+    return queue;
+}
+cl_kernel MiniOCL::getKernel()
+{
+    return kernel;
 }
 
 /*

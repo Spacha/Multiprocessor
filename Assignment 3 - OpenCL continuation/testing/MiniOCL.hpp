@@ -20,8 +20,10 @@ class MiniOCL
     void *outputData;
 
 	// device (image) buffers
+    unsigned int argIndex;
     cl_mem inputBuffer;
     cl_mem outputBuffer;
+    std::vector <cl_mem> buffers;
 
     // OpenCL objects
     cl_platform_id platform;            // OpenCL platform
@@ -41,8 +43,14 @@ public:
 	bool buildKernel(const std::string *name, const char **source);
 	bool setWorkGroupSize(size_t localWidth, size_t localHeight);
 	bool setImageBuffers(void *in, void *out, size_t width, size_t height);
+	bool setInputBuffer(const void *data, size_t size);
+	bool setArg(const void *data, size_t size);
 	bool executeKernel(size_t localWidth, size_t localHeight);
 	bool displayDeviceInfo(cl_device_id device_id = NULL);
 	double getExecutionTime();
+
+	cl_context getContext();
+	cl_command_queue getQueue();
+	cl_kernel getKernel();
 	~MiniOCL();
 };
