@@ -60,8 +60,8 @@ typedef struct filter_s filter_t;
 // GLOBAL VARIABLES
 ///////////////////////////////////////////////////////////////////////////////
 
-const char *kernelFileName = "kernels.cl";      // the file that contains the kernels
-const std::string imgName  = "img/simple.png";    // the image to load from disk
+const char *kernelFileName = "kernels.cl";              // the file that contains the kernels
+// const std::string defaultImgName  = "img/simple.png";    // the image to load from disk
 
 ///////////////////////////////////////////////////////////////////////////////
 // FILTERS
@@ -436,13 +436,6 @@ public:
             0, static_cast<void *>(image.data()), width, height);
         ocl->setOutputImageBuffer(
             1, static_cast<void *>(image.data()), width, height);
-#if 0
-        this->ocl->setImageBuffers(
-            static_cast<void *>(this->image.data()), // input image
-            static_cast<void *>(this->image.data()), // output image (overwrite)
-            width,
-            height);
-#endif
 
         cl_mem maskBuffer = clCreateBuffer(
             ocl->getContext(),
@@ -596,11 +589,23 @@ public:
 * MAIN
 ******************************************************************************/
 
-int main()
+int main(int argc, char *argv[])
 {
     bool success;
-    Image img;
-    PerfTimer ptimer; // used for measuring execution time
+    Image img;              // holds the image name that is being handled
+    PerfTimer ptimer;       // used for measuring execution time
+    std::string imgName;    // the image name that is being handled
+
+    // if an argument is provided, use as image name
+    if (argc > 1)
+    {
+        imgName = argv[1];
+    }
+    else
+    {
+        cout << "Image name is required as an argument!" << endl;
+        return EXIT_FAILURE;
+    }
 
     // seems to be typically around 100-300 us
     cout << "NOTE: The execution times include some printing to console." << endl;
