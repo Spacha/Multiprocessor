@@ -147,9 +147,11 @@ bool MiniOCL::setOutputImageBuffer(cl_uint argIndex, void *data, size_t width, s
 {
     cl_int err = CL_SUCCESS;
 
+    /*
     this->out = data;
     this->width = width;
     this->height = height;
+    */
 
     // Pixel format: RGBA, each pixel channel is unsigned 8-bit integer
     static const cl_image_format format = { CL_RGBA, CL_UNORM_INT8 };
@@ -158,21 +160,18 @@ bool MiniOCL::setOutputImageBuffer(cl_uint argIndex, void *data, size_t width, s
         CL_MEM_OBJECT_IMAGE2D, width, height, 0, 0, 0, 0, 0, 0, NULL
     };
 
+    size_t origin[3] = { 0, 0, 0 };
+    size_t region[3] = { width, height, 1 };
+
     cl_mem_flags flags = CL_MEM_WRITE_ONLY;
-    /*
-    outputBuffer.buffer = clCreateImage(context, flags, &format, &description, NULL, &err);
-    outputBuffer.data = data;
-    outputBuffer.origin[0] = 0;
-    outputBuffer.origin[1] = 0;
-    outputBuffer.origin[2] = 0;
-    outputBuffer.region[0] = width;
-    outputBuffer.region[1] = height;
-    outputBuffer.region[2] = 1;
-    */
+    outImg.buffer = clCreateImage(context, flags, &format, &description, NULL, &err);
+    outImg.data = data;
 
-    outputBuffer = clCreateImage(context, flags, &format, &description, NULL, &err);
+    // set the image origin and region
+    std::copy(origin, origin + 3, outImg.origin);
+    std::copy(region, region + 3, outImg.region);
 
-    err |= clSetKernelArg(kernel, argIndex, sizeof(cl_mem), &outputBuffer);
+    err |= clSetKernelArg(kernel, argIndex, sizeof(cl_mem), &outImg.buffer);
 
     return err == CL_SUCCESS;
 }
@@ -181,6 +180,13 @@ bool MiniOCL::readOutput()
 {
     cl_int err = CL_SUCCESS;
 
+    err |= clEnqueueReadImage(queue,
+        outImg.buffer, CL_TRUE,
+        outImg.origin,
+        outImg.region, 0, 0,
+        outImg.data, 0, NULL, NULL);
+
+    /*
     size_t origin[] = {0,0,0};
     size_t region[] = {width, height, 1};
     err |= clEnqueueReadImage(queue,
@@ -188,13 +194,6 @@ bool MiniOCL::readOutput()
             origin,
             region, 0, 0,
             out, 0, NULL, NULL);
-
-    /*
-    err |= clEnqueueReadImage(queue,
-            outputBuffer.buffer, CL_TRUE,
-            outputBuffer.origin,
-            outputBuffer.region, 0, 0,
-            outputBuffer.data, 0, NULL, NULL);
 
     for (int i = 0; i < outputBuffers.size(); i++)
     {
@@ -286,13 +285,14 @@ double MiniOCL::getExecutionTime()
     clGetEventProfilingInfo(kernelEvent, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, NULL);
     clGetEventProfilingInfo(kernelEvent, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
 
-    return (time_end - time_start)/1000.0;
+    return (time_end - time_start) / 1000.0;
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
+#if 0
 bool MiniOCL::setImageBuffers(void *in, void *out, size_t width, size_t height)
 {
     cl_int err = CL_SUCCESS;
@@ -347,7 +347,7 @@ bool MiniOCL::setImageBuffers(void *in, void *out, size_t width, size_t height)
 
     return err == CL_SUCCESS;
 }
-
+#endif
 cl_context MiniOCL::getContext()
 {
     return context;
@@ -378,3 +378,4 @@ double microSeconds = ocl.getExecutionTime();
 
 ocl.terminate();
 */
+

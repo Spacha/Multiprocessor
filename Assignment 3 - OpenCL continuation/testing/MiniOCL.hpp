@@ -7,14 +7,16 @@
 #include <stdlib.h>
 #include <CL/cl.h>
 
-struct output_buffer_s
+struct image_buf_s
 {
 	cl_mem buffer;
 	void *data;
 	size_t origin[3];
 	size_t region[3];
+	// std::array<size_t,3> origin;
+	// std::array<size_t,3> region;
 };
-typedef struct output_buffer_s output_buffer_t;
+typedef struct image_buf_s image_buf_t;
 
 /**
  * A simple wrapper class for accessing OpenCL.
@@ -22,11 +24,10 @@ typedef struct output_buffer_s output_buffer_t;
 class MiniOCL
 {
 	unsigned int device_type;
-	std::string kernelName;
+
+	image_buf_t outImg;
 
     std::vector<cl_mem> buffers;
-
-    cl_mem inputBuffer;
     cl_mem outputBuffer;
     void *out;
     size_t width;
@@ -60,7 +61,7 @@ public:
 	bool setOutputImageBuffer(cl_uint argIndex, void *data, size_t width, size_t height);
 
 	// bool setWorkGroupSize(size_t localWidth, size_t localHeight);
-bool setImageBuffers(void *in, void *out, size_t width, size_t height);
+	// bool setImageBuffers(void *in, void *out, size_t width, size_t height);
 	// bool setInputBuffer(const void *data, size_t size);
 	// bool setArg(const void *data, size_t size);
 	bool displayDeviceInfo(cl_device_id device_id = NULL);

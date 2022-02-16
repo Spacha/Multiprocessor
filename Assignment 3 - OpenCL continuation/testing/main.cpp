@@ -431,11 +431,18 @@ public:
         }
 
         success = this->ocl->buildKernel(kernelFileName, "filter");
+
+        ocl->setInputImageBuffer(
+            0, static_cast<void *>(image.data()), width, height);
+        ocl->setOutputImageBuffer(
+            1, static_cast<void *>(image.data()), width, height);
+#if 0
         this->ocl->setImageBuffers(
             static_cast<void *>(this->image.data()), // input image
             static_cast<void *>(this->image.data()), // output image (overwrite)
             width,
             height);
+#endif
 
         cl_mem maskBuffer = clCreateBuffer(
             ocl->getContext(),
