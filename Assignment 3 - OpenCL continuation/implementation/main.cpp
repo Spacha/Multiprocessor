@@ -60,8 +60,8 @@ typedef struct filter_s filter_t;
 // GLOBAL VARIABLES
 ///////////////////////////////////////////////////////////////////////////////
 
-const char *kernelFileName = "kernels.cl";              // the file that contains the kernels
-// const std::string defaultImgName  = "img/simple.png";    // the image to load from disk
+const char *kernelFileName = "kernels.cl";
+// const std::string imgName  = "img/simple.png";
 
 ///////////////////////////////////////////////////////////////////////////////
 // FILTERS
@@ -159,15 +159,15 @@ public:
      **/
     void printTime()
     {
-        double delta_us = this->getMicroseconds();
+        double us = this->getMicroseconds();
 
         std::string unitsStr;
         double divisor;
 
-        if (delta_us < 1000) {              // microseconds
+        if (us < 1000) {                    // microseconds
             unitsStr = "us";
             divisor = 1;
-        } else if (delta_us < 1000000) {    // milliseconds
+        } else if (us < 1000000) {          // milliseconds
             unitsStr = "ms";
             divisor = 1000;
         } else {
@@ -175,7 +175,7 @@ public:
             divisor = 1000000;
         }
 
-        printf("\t=> time: %0.3f %s\n", delta_us/divisor, unitsStr.c_str());
+        printf("\t=> time: %0.3f %s\n", us / divisor, unitsStr.c_str());
     }
 };
 
@@ -576,6 +576,8 @@ int main(int argc, char *argv[])
     cout << "Image manipulation is done using " << computeDeviceStr() << "." << endl;
 
 #ifdef USE_OCL
+    double kernelTime;
+
     // initialize OpenCL if necessary
     MiniOCL ocl;
     ocl.initialize(TARGET_DEVICE_TYPE);
@@ -600,8 +602,8 @@ int main(int argc, char *argv[])
 
 #ifdef USE_OCL
     // print the actual kernel execution time
-    double microSeconds = ocl.getExecutionTime();
-    printf("\t=> Kernel execution time: %0.3f us \n", microSeconds);
+    kernelTime = ocl.getExecutionTime();
+    printf("\t=> Kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
 #endif /* USE_OCL */
 
     ptimer.reset();
@@ -614,6 +616,12 @@ int main(int argc, char *argv[])
     success = img.filter(gaussianFilter); // meanFilter / gaussianFilter
     ptimer.printTime();
     CHECK_ERROR(success, "Error filtering the image.")
+
+#ifdef USE_OCL
+    // print the actual kernel execution time
+    kernelTime = ocl.getExecutionTime();
+    printf("\t=> Kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
+#endif /* USE_OCL */
 
     // 4. save filtered image
     ptimer.reset();

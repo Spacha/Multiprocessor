@@ -82,7 +82,6 @@ bool MiniOCL::executeKernel(size_t globalWidth, size_t globalHeight, size_t loca
  
     // wait for the command queue to get serviced before reading back results
     clFinish(queue);
-
     this->readOutput();
 
     return err == CL_SUCCESS;
