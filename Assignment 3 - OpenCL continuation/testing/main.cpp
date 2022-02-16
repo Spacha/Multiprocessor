@@ -14,7 +14,7 @@ using std::endl;
 
 /**
  * Compile & run:
- *   cls && g++ -v main.cpp MiniOCL.cpp lodepng.cpp %OCL_ROOT%/lib/x86_64/opencl.lib -Wall -I %OCL_ROOT%\include -o image-filter.exe && image-filter.exe
+ *   cls && g++ main.cpp MiniOCL.cpp lodepng.cpp %OCL_ROOT%/lib/x86_64/opencl.lib -Wall -I %OCL_ROOT%\include -o image-filter.exe && image-filter.exe
  **/
 
 // These are options for COMPUTE_DEVICE.
@@ -35,7 +35,7 @@ using std::endl;
 struct filter_s
 {
     const size_t size;      // size of the mask (height or width)
-    const float factor;     // the mask is multiplied by this
+    const float divisor;    // the mask is divided by this
     const float *mask;      // the actual filter mask
 };
 typedef struct filter_s filter_t;
@@ -60,70 +60,8 @@ typedef struct filter_s filter_t;
 // GLOBAL VARIABLES
 ///////////////////////////////////////////////////////////////////////////////
 
-// See OpenCL Programming Guide p.342.
-// OpenCL kernel. Each work item takes care of one element of C.
-
-const char *ksGrayscale = "\n" \
-"__constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE |                 \n" \
-"                               CLK_ADDRESS_CLAMP_TO_EDGE   |                 \n" \
-"                               CLK_FILTER_NEAREST;                           \n" \
-"__kernel void RGBA2grayscale(__read_only image2d_t in,                       \n" \
-"                         __write_only image2d_t out)                         \n" \
-"{                                                                            \n" \
-"    int2 coord = (int2)(get_global_id(0), get_global_id(1));                 \n" \
-"    float4 clr = read_imagef(in, sampler, coord);                            \n" \
-"                                                                             \n" \
-"    // NTCS grey conversion                                                  \n" \
-"    float gray = 0.299f*clr[0] + 0.587f*clr[1] + 0.114f*clr[2];              \n" \
-"    write_imagef(out, coord, (float4)(gray, gray, gray, 1.0f));              \n" \
-"}                                                                            \n" \
-"\n";
-
-
-
-const char *ksFilter = "\n" \
-"__constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE |                 \n" \
-"                               CLK_ADDRESS_CLAMP_TO_EDGE   |                 \n" \
-"                               CLK_FILTER_NEAREST;                           \n" \
-"__kernel void filter(__read_only image2d_t in,                               \n" \
-"                     __write_only image2d_t out,                             \n" \
-"                     __read_only float *mask,                                \n" \
-"                     const unsigned int maskSize)                            \n" \
-"{                                                                            \n" \
-"}                                                                            \n" \
-"\n";
-#if 0
-,                                            \n" \
-"                     float factor,                                           \n" \
-"                     int maskSize
-
-"    int d = maskSize / 2;                                                    \n" \
-"    int2 center = (get_global_id(0), get_global_id(0));                      \n" \
-"    int2 topLeft = center - d;                                               \n" \
-"    int2 btRight = center + d;                                               \n" \
-"                                                                             \n" \
-"    if (center.x < width && center.y < height)                               \n" \
-"    {                                                                        \n" \
-"        int weight = 0;                                                      \n" \
-"        float4 newClr = (float4)(0.0f, 0.0f, 0.0f, 0.0f);                    \n" \
-"                                                                             \n" \
-"        // iterate over each element in the mask                             \n" \
-"        for (int y = topLeft.y; y <= btRight.y; y++)                         \n" \
-"        {                                                                    \n" \
-"            for (int x = topLeft.x; x <= btRight.x; x++)                     \n" \
-"            {                                                                \n" \
-"                newClr += (read_imagef(in, sampler, (int2)(x, y)) *          \n" \
-"                    mask[weight] * factor);                                  \n" \
-"                                                                             \n" \
-"                weight += 1;                                                 \n" \
-"            }                                                                \n" \
-"        }                                                                    \n" \
-"                                                                             \n" \
-"        write_imagef(out, center, newClr);                                   \n" \
-"    }                                                                        \n" \
-
-#endif
-
+const char *kernelFileName = "kernels.cl";      // the file that contains the kernels
+const std::string imgName  = "img/simple.png";    // the image to load from disk
 
 ///////////////////////////////////////////////////////////////////////////////
 // FILTERS
@@ -141,7 +79,7 @@ const float meanFilterMask[maskSize*maskSize] = { // 0.04 = 1/25 = 1/(5*5)
 };
 const filter_t meanFilter = {
     .size = maskSize,
-    .factor = 1/25.0f,
+    .divisor = 25.0f,
     .mask = meanFilterMask
 };
 
@@ -155,7 +93,7 @@ const float gaussianFilterMask[maskSize*maskSize] = {
 };
 const filter_t gaussianFilter = {
     .size = maskSize,
-    .factor = 1/273.0f,
+    .divisor = 273.0f,
     .mask = gaussianFilterMask
 };
 
@@ -431,15 +369,25 @@ public:
             return false;
         }
 
-        const std::string kernelName = "RGBA2grayscale";
-        success = this->ocl->buildKernel(&kernelName, &ksGrayscale);
-        success = this->ocl->setImageBuffers(
+#if 0
+        success = this->ocl->buildKernel(kernelFileName, "grayscale");
+        this->ocl->setImageBuffers(
             static_cast<void *>(this->image.data()), // input image
             static_cast<void *>(this->image.data()), // output image (overwrite)
             width,
             height);
 
-        success = this->ocl->executeKernel(16, 16);
+        success = ocl->executeKernel(width, height, 16, 16);
+#endif
+
+        success = ocl->buildKernel(kernelFileName, "grayscale");
+
+        ocl->setInputImageBuffer(
+            0, static_cast<void *>(image.data()), width, height);
+        ocl->setOutputImageBuffer(
+            1, static_cast<void *>(image.data()), width, height);
+
+        success = this->ocl->executeKernel(width, height, 16, 16);
 
 #else /* No parallelization */
 
@@ -482,22 +430,45 @@ public:
             return false;
         }
 
-        // *in, *out, *mask, maskSize, factor
-        const std::string kernelName = "filter";
-        this->ocl->buildKernel(&kernelName, &ksFilter);
+        success = this->ocl->buildKernel(kernelFileName, "filter");
         this->ocl->setImageBuffers(
             static_cast<void *>(this->image.data()), // input image
             static_cast<void *>(this->image.data()), // output image (overwrite)
             width,
             height);
+
+        cl_mem maskBuffer = clCreateBuffer(
+            ocl->getContext(),
+            CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS | CL_MEM_COPY_HOST_PTR,
+            filter.size * filter.size * sizeof(float),
+            (void *)filter.mask,
+            NULL);
+        
+        clSetKernelArg(ocl->getKernel(), 2, sizeof(cl_mem), &maskBuffer);
+        clSetKernelArg(ocl->getKernel(), 3, sizeof(int), &filter.size);
+        clSetKernelArg(ocl->getKernel(), 4, sizeof(float), &filter.divisor);
+
+        success = ocl->executeKernel(width, height, 16, 16);
+
 #if 0
-        this->ocl->setInputBuffer(&filter.mask, sizeof(float) * filter.size * filter.size);
-        this->ocl->setArg(&filter.size, sizeof(size_t));
-        this->ocl->setArg(&filter.factor, sizeof(float));
+        // set up OpenCL for execution
+
+        success = ocl->buildKernel(kernelFileName, "filter");
+
+        ocl->setInputImageBuffer(
+            0, static_cast<void *>(image.data()), width, height);
+        ocl->setOutputImageBuffer(
+            1, static_cast<void *>(image.data()), width, height);
+
+        ocl->setInputBuffer(
+            2, (void *)filter.mask, filter.size * filter.size * sizeof(float));
+        ocl->setValue(
+            3, (void *)&filter.size, sizeof(int));
+        ocl->setValue(
+            4, (void *)&filter.divisor, sizeof(float));
+
+        success = ocl->executeKernel(width, height, 16, 16);
 #endif
-
-
-        success = this->ocl->executeKernel(16, 16);
 
 #else /* No parallelization */
 
@@ -533,9 +504,9 @@ public:
                 }
                 // cout << "\t(" << cx << "," << cy << ") " << newClr.red << " -> ";
                 pixel_t pixelInt = {
-                    (unsigned char)(filter.factor * newClr.red),
-                    (unsigned char)(filter.factor * newClr.green),
-                    (unsigned char)(filter.factor * newClr.blue),
+                    (unsigned char)(newClr.red / filter.divisor),
+                    (unsigned char)(newClr.green / filter.divisor),
+                    (unsigned char)(newClr.blue / filter.divisor),
                     (unsigned char)(newClr.alpha)
                 };
                 // cout << (unsigned int)newClr.red << endl;
@@ -624,8 +595,6 @@ int main()
     Image img;
     PerfTimer ptimer; // used for measuring execution time
 
-    const std::string imgName = "img/simple.png"; // the image to load from disk
-
     // seems to be typically around 100-300 us
     cout << "NOTE: The execution times include some printing to console." << endl;
     cout << "Image manipulation is done using " << computeDeviceStr() << "." << endl;
@@ -675,6 +644,11 @@ int main()
     img.save("img/filtered.png");
     ptimer.printTime();
     CHECK_ERROR(success, "Error saving the image to disk.")
+
+    cout << ">" << img.image[0] << endl;
+    cout << ">" << img.image[1] << endl;
+    cout << ">" << img.image[2] << endl;
+    cout << ">" << img.image[3] << endl;
 
     return EXIT_SUCCESS;
 }

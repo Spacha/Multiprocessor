@@ -31,123 +31,47 @@ bool MiniOCL::initialize(cl_device_type device_type)
     context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
  
     // create a command queue
+    // this is a list of consecutive pairs of "key" and "value" terminated by 0
     cl_queue_properties properties[] = {
         CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE,
         0};
     queue = clCreateCommandQueueWithProperties(context, device_id, properties, &err);
-    // queue = clCreateCommandQueue(context, device_id, CL_QUEUE_PROFILING_ENABLE, &err);
-
-    argIndex = 0;
 
     return err == CL_SUCCESS;
 }
 
-bool MiniOCL::buildKernel(const std::string *name, const char **source)
+// bool MiniOCL::buildKernel(const std::string *name, const char **source)
+bool MiniOCL::buildKernel(const char *fileName, const char *kernelName)
 {
     cl_int err = CL_SUCCESS;
 
-    kernelName = *name;
-    // kernelSource = source;
+    // read the kernel source from the file
+    std::ifstream kernelFile(fileName);
+    std::string source(std::istreambuf_iterator<char>(kernelFile), (std::istreambuf_iterator<char>()));
 
     // create the compute program from the source buffer
-    program = clCreateProgramWithSource(context, 1, source, NULL, &err);
+    const char* sourceStr = source.c_str();
+    size_t sourceSizes[] = { strlen(sourceStr) };
+    program = clCreateProgramWithSource(context, 1, &sourceStr, sourceSizes, &err);
 
-    // build the program executable 
+    // build the program executable
     clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
 
     // create the compute kernel in the program we wish to run
-    kernel = clCreateKernel(program, kernelName.c_str(), &err);
+    kernel = clCreateKernel(program, kernelName, &err);
 
     return err == CL_SUCCESS;
 }
 
-bool MiniOCL::setImageBuffers(void *in, void *out, size_t width, size_t height)
-{
-    cl_int err = CL_SUCCESS;
-
-    this->inputData = in;
-    this->outputData = out;
-    this->imageWidth = width;
-    this->imageHeight = height;
-
-    // Pixel format: RGBA, each pixel channel is unsigned 8-bit integer
-    static const cl_image_format imgFormat = { CL_RGBA, CL_UNORM_INT8 };
-
-    static const cl_image_desc imgDesc = {
-        CL_MEM_OBJECT_IMAGE2D,                      // cl_mem_object_type image_type
-        width,                                      // size_t image_width
-        height,                                     // size_t image_height
-        0,                                          // size_t image_depth
-        0,                                          // size_t image_array_size
-        0,                                          // size_t image_row_pitch; 0 => calculated automatically
-        0,                                          // size_t image_slice_pitch; 0 => calculated automatically
-        0,                                          // cl_uint num_mip_levels
-        0,                                          // cl_uint num_samples
-        NULL                                        // cl_mem buffer
-    };
-    this->inputBuffer = clCreateImage(
-        context,
-        CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,    // host can only read this image
-        &imgFormat,                                 // image (array) format
-        &imgDesc,                                   // image description
-        inputData,                                  // the image data is sourced from here
-        &err);
-
-    this->outputBuffer = clCreateImage(
-        context,
-        CL_MEM_WRITE_ONLY,
-        &imgFormat,
-        &imgDesc,
-        NULL,
-        &err);
-
-    // set the arguments to the kernel
-    err |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputBuffer);
-    err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputBuffer);
-    
-    argIndex += 2;
-
-    return err == CL_SUCCESS;
-}
-
-/**
- * TODO: Make this (these) more robust and versatile!
- **/
-bool MiniOCL::setInputBuffer(const void *data, size_t size)
-{
-    cl_int err = CL_SUCCESS;
-
-    buffers.push_back(
-        clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, size, (void *)data, &err)
-    );
-
-    err |= clSetKernelArg(kernel, argIndex, sizeof(cl_mem), buffers.back());
-    argIndex++;
-
-    return err == CL_SUCCESS;
-}
-/**
- * TODO: Make this (these) more robust and versatile!
- **/
-bool MiniOCL::setArg(const void *data, size_t size)
-{
-    cl_int err = CL_SUCCESS;
-
-    err |= clSetKernelArg(kernel, argIndex, size, data);
-    argIndex++;
-
-    return err == CL_SUCCESS;
-}
-
-bool MiniOCL::executeKernel(size_t localWidth, size_t localHeight)
+bool MiniOCL::executeKernel(size_t globalWidth, size_t globalHeight, size_t localWidth, size_t localHeight)
 {
     cl_int err = CL_SUCCESS;
 
     // set work sizes (based on local work size)
     const size_t localWorkSize[2] = { localWidth, localHeight };
     const size_t globalWorkSize[2] = {
-        (size_t)ceil(imageWidth/(float)localWorkSize[0]) * localWorkSize[0],
-        (size_t)ceil(imageHeight/(float)localWorkSize[1]) * localWorkSize[1]};
+        (size_t)ceil(globalWidth/(float)localWorkSize[0]) * localWorkSize[0],
+        (size_t)ceil(globalHeight/(float)localWorkSize[1]) * localWorkSize[1]};
 
     // Execute the kernel over the entire range of the data set
     err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, globalWorkSize, localWorkSize,
@@ -159,27 +83,132 @@ bool MiniOCL::executeKernel(size_t localWidth, size_t localHeight)
     // wait for the command queue to get serviced before reading back results
     clFinish(queue);
 
-    // read the results from the device
-    size_t origin[] = {0,0,0};
-    size_t region[] = {imageWidth, imageHeight, 1};
-
-    err |= clEnqueueReadImage(
-        queue,                      // cl_command_queue command_queue
-        outputBuffer,               // cl_mem image
-        CL_TRUE,                    // cl_bool blocking_read
-        origin,                     // const size_t *origin[3]
-        region,                     // const size_t *region[3]
-        0,                          // size_t input_row_pitch
-        0,                          // size_t input_slice_pitch
-        outputData,                 // const void *ptr
-        0,                          // cl_uint num_events_in_wait_list
-        NULL,                       // const cl_eventevent_wait_list
-        NULL);                      // cl_event *event
-
-    cout << err << endl;
+    this->readOutput();
 
     return err == CL_SUCCESS;
 }
+
+bool MiniOCL::setValue(cl_uint argIndex, void *value, size_t size)
+{
+    cl_int err = CL_SUCCESS;
+
+    err = clSetKernelArg(kernel, argIndex, size, value);
+
+    return err == CL_SUCCESS;
+}
+
+bool MiniOCL::setInputBuffer(cl_uint argIndex, void *data, size_t size)
+{
+    cl_int err = CL_SUCCESS;
+
+    cl_mem_flags flags = CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS | CL_MEM_COPY_HOST_PTR;
+    // cl_mem buffer = clCreateBuffer(context, flags, size, data, &err);
+    buffers.push_back( clCreateBuffer(context, flags, size, data, &err) );
+
+    err |= clSetKernelArg(kernel, argIndex, sizeof(cl_mem), &buffers.back());
+    // this->setValue(argIndex, (void *)&buffer, sizeof(cl_mem));
+
+    return err == CL_SUCCESS;
+}
+
+bool MiniOCL::setOutputBuffer(cl_uint argIndex, void *data, size_t size)
+{
+    cl_int err = CL_SUCCESS;
+
+    err = CL_INVALID_VALUE; // Not implemented!
+
+    // don't forget to use output_buffer_t
+
+    return err == CL_SUCCESS;
+}
+
+bool MiniOCL::setInputImageBuffer(cl_uint argIndex, void *data, size_t width, size_t height)
+{
+    cl_int err = CL_SUCCESS;
+
+    // Pixel format: RGBA, each pixel channel is unsigned 8-bit integer
+    static const cl_image_format format = { CL_RGBA, CL_UNORM_INT8 };
+
+    static const cl_image_desc description = {
+        CL_MEM_OBJECT_IMAGE2D, width, height, 0, 0, 0, 0, 0, 0, NULL
+    };
+
+    cl_mem_flags flags = CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR;
+    // cl_mem buffer = clCreateImage(context, flags, &format, &description, data, &err);
+    cl_mem buffer = clCreateImage(context, flags, &format, &description, data, &err);
+
+    // set the arguments to the kernel
+    err |= clSetKernelArg(kernel, argIndex, sizeof(cl_mem), &buffer);
+    
+    return err == CL_SUCCESS;
+}
+
+bool MiniOCL::setOutputImageBuffer(cl_uint argIndex, void *data, size_t width, size_t height)
+{
+    cl_int err = CL_SUCCESS;
+
+    this->out = data;
+    this->width = width;
+    this->height = height;
+
+    // Pixel format: RGBA, each pixel channel is unsigned 8-bit integer
+    static const cl_image_format format = { CL_RGBA, CL_UNORM_INT8 };
+
+    static const cl_image_desc description = {
+        CL_MEM_OBJECT_IMAGE2D, width, height, 0, 0, 0, 0, 0, 0, NULL
+    };
+
+    cl_mem_flags flags = CL_MEM_WRITE_ONLY;
+    /*
+    outputBuffer.buffer = clCreateImage(context, flags, &format, &description, NULL, &err);
+    outputBuffer.data = data;
+    outputBuffer.origin[0] = 0;
+    outputBuffer.origin[1] = 0;
+    outputBuffer.origin[2] = 0;
+    outputBuffer.region[0] = width;
+    outputBuffer.region[1] = height;
+    outputBuffer.region[2] = 1;
+    */
+
+    outputBuffer = clCreateImage(context, flags, &format, &description, NULL, &err);
+
+    err |= clSetKernelArg(kernel, argIndex, sizeof(cl_mem), &outputBuffer);
+
+    return err == CL_SUCCESS;
+}
+
+bool MiniOCL::readOutput()
+{
+    cl_int err = CL_SUCCESS;
+
+    size_t origin[] = {0,0,0};
+    size_t region[] = {width, height, 1};
+    err |= clEnqueueReadImage(queue,
+            outputBuffer, CL_TRUE,
+            origin,
+            region, 0, 0,
+            out, 0, NULL, NULL);
+
+    /*
+    err |= clEnqueueReadImage(queue,
+            outputBuffer.buffer, CL_TRUE,
+            outputBuffer.origin,
+            outputBuffer.region, 0, 0,
+            outputBuffer.data, 0, NULL, NULL);
+
+    for (int i = 0; i < outputBuffers.size(); i++)
+    {
+        err |= clEnqueueReadImage(queue,
+            outputBuffers[i].buffer, CL_TRUE,
+            outputBuffers[i].origin,
+            outputBuffers[i].region, 0, 0,
+            outputBuffers[i].data, 0, NULL, NULL);
+    }
+    */
+
+    return err == CL_SUCCESS;
+}
+
 
 /**
  * Display OpenCL device information.
@@ -258,6 +287,65 @@ double MiniOCL::getExecutionTime()
     clGetEventProfilingInfo(kernelEvent, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
 
     return (time_end - time_start)/1000.0;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+bool MiniOCL::setImageBuffers(void *in, void *out, size_t width, size_t height)
+{
+    cl_int err = CL_SUCCESS;
+
+    this->out = out;
+    this->width = width;
+    this->height = height;
+
+    // Pixel format: RGBA, each pixel channel is unsigned 8-bit integer
+    static const cl_image_format imgFormat = { CL_RGBA, CL_UNORM_INT8 };
+
+    static const cl_image_desc imgDesc = {
+        CL_MEM_OBJECT_IMAGE2D,                      // cl_mem_object_type image_type
+        width,                                      // size_t image_width
+        height,                                     // size_t image_height
+        0,                                          // size_t image_depth
+        0,                                          // size_t image_array_size
+        0,                                          // size_t image_row_pitch; 0 => calculated automatically
+        0,                                          // size_t image_slice_pitch; 0 => calculated automatically
+        0,                                          // cl_uint num_mip_levels
+        0,                                          // cl_uint num_samples
+        NULL                                        // cl_mem buffer
+    };
+    inputBuffer = clCreateImage(
+        context,
+        CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,    // host can only read this image
+        &imgFormat,                                 // image (array) format
+        &imgDesc,                                   // image description
+        in,                                         // the image data is sourced from here
+        &err);
+
+/*
+    this->outputBuffer2 = clCreateImage(
+        context,
+        CL_MEM_WRITE_ONLY,
+        &imgFormat,
+        &imgDesc,
+        NULL,
+        &err);
+*/
+    outputBuffer = clCreateImage(
+        context,
+        CL_MEM_WRITE_ONLY,
+        &imgFormat,
+        &imgDesc,
+        NULL,
+        &err);
+
+    // set the arguments to the kernel
+    err |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputBuffer);
+    err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputBuffer);
+
+    return err == CL_SUCCESS;
 }
 
 cl_context MiniOCL::getContext()

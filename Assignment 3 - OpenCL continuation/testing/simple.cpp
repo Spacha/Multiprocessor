@@ -110,6 +110,8 @@ cl_int displayDeviceInfo(cl_device_id device)
 const char *kernelSource = "\n" \
 "__kernel void pixel_stuff(__read_only image2d_t in,                          \n" \
 "                         __write_only image2d_t out,                         \n" \
+"                         unsigned int width,                                 \n" \
+"                         __constant float *ftest,                           \n" \
 "                         sampler_t sampler)                                  \n" \
 "{                                                                            \n" \
 "    // get our global thread ID                                              \n" \
@@ -185,6 +187,8 @@ int main()
  
     // create the compute program from the source buffer
     program = clCreateProgramWithSource(context, 1, (const char **)&kernelSource, NULL, &err);
+
+    CHECK_ERROR(err)
  
     // build the program executable 
     clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
@@ -228,8 +232,7 @@ int main()
     // d_in = clCreateBuffer(context, CL_MEM_READ_ONLY, bytes, NULL, NULL);
     // d_out = clCreateBuffer(context, CL_MEM_WRITE_ONLY, bytes, NULL, NULL);
 
-    size_t origin[] = {0,0,0};
-    size_t region[] = {width, height, 1};
+
 #if 0
     // NOTE: This is not necessary if CL_MEM_COPY_HOST_PTR is used!
     err |= clEnqueueWriteImage(
@@ -245,8 +248,10 @@ int main()
         NULL,                                   // const cl_eventevent_wait_list
         NULL);                                  // cl_event *event
 #endif
- 
     CHECK_ERROR(err);
+
+    size_t origin[] = {0,0,0};
+    size_t region[] = {width, height, 1};
 
     /*
     // write the data set into the input array in device memory
@@ -263,11 +268,46 @@ int main()
         CL_ADDRESS_CLAMP_TO_EDGE,               // Disallow sampling over the edge
         CL_FILTER_NEAREST,                      // Take the nearest true pixel value
         &err);
+
+    unsigned int width_test = 123;
+    // float ftest[16] = { 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 };
+    float *ftest = (float *)malloc(16 * sizeof(float));
+    ftest[0] = 1;
+    ftest[1] = 2;
+    ftest[2] = 3;
+    ftest[3] = 4;
+    ftest[4] = 5;
+    ftest[5] = 6;
+    ftest[6] = 7;
+    ftest[7] = 8;
+    ftest[8] = 9;
+    ftest[9] = 10;
+    ftest[10] = 11;
+    ftest[11] = 12;
+    ftest[12] = 13;
+    ftest[13] = 14;
+    ftest[14] = 15;
+    ftest[15] = 16;
+
+    cl_mem fbuf = clCreateBuffer(
+        context,
+        CL_MEM_READ_ONLY,
+        16 * sizeof(float),
+        NULL,
+        NULL);
+    clEnqueueWriteBuffer(queue, fbuf, CL_TRUE, 0, 16 * sizeof(float), ftest, 0, NULL, NULL);
+
+    /*
+    clEnqueueReadBuffer(queue, d_c, CL_TRUE, 0,
+                                bytes, h_c, 0, NULL, NULL );
+    */
  
     // Set the arguments to our compute kernel
     err |= clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputImg);
     err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputImg);
-    err |= clSetKernelArg(kernel, 2, sizeof(cl_sampler), &sampler);
+    err |= clSetKernelArg(kernel, 2, sizeof(unsigned int), &width_test);
+    err |= clSetKernelArg(kernel, 3, sizeof(cl_mem), &fbuf);
+    err |= clSetKernelArg(kernel, 4, sizeof(cl_sampler), &sampler);
 
     CHECK_ERROR(err);
 
@@ -283,6 +323,7 @@ int main()
     cl_event kernelDoneEvt;
     err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, globalWorkSize, localWorkSize,
                                  0, NULL, &kernelDoneEvt);
+
 
     // wait for the kernel to finish
     clWaitForEvents(1, &kernelDoneEvt);
@@ -300,7 +341,7 @@ int main()
     err = displayDeviceInfo(device_id);
     double microSeconds = (time_end - time_start)/1000.0;
     printf("Execution time: %0.3f us \n", microSeconds);
- 
+
     // read the results from the device
     err |= clEnqueueReadImage(
         queue,                      // cl_command_queue command_queue
@@ -312,12 +353,8 @@ int main()
         0,                          // size_t input_slice_pitch
         imgOut,                     // const void *ptr
         0,                          // cl_uint num_events_in_wait_list
-        NULL,                       // const cl_eventevent_wait_list
+        NULL,                       // const cl_event event_wait_list
         NULL);                      // cl_event *event
-    /*
-    clEnqueueReadBuffer(queue, d_c, CL_TRUE, 0,
-                                bytes, h_c, 0, NULL, NULL );
-    */
 
     for (unsigned int i = 0; i < bytes; i++)
     {
