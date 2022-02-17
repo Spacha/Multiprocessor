@@ -22,10 +22,8 @@ typedef struct image_buf_s image_buf_t;
  **/
 class MiniOCL
 {
-	cl_device_type device_type;
-	image_buf_t outImg;
-    size_t width;
-    size_t height;
+	cl_device_type device_type; 		// OpenCL target device type
+	image_buf_t outImg; 				// the output image struct (only single one)
 
     // OpenCL objects
     cl_platform_id platform;            // OpenCL platform
@@ -42,7 +40,6 @@ public:
 
 	// OpenCL workflow
 	bool initialize(cl_device_type device_type);
-	// bool buildKernel(const std::string *name, const char **source);
 	bool buildKernel(const char *fileName, const char *kernelName);
 	bool executeKernel(size_t globalWidth, size_t globalHeight, size_t localWidth, size_t localHeight);
 

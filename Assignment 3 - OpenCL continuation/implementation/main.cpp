@@ -70,7 +70,7 @@ const char *kernelFileName = "kernels.cl";
 const size_t maskSize = 5;
 
 // Mean/averaging filter (5x5)
-const float meanFilterMask[maskSize*maskSize] = { // 0.04 = 1/25 = 1/(5*5)
+const float meanFilterMask[maskSize*maskSize] = {
     1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
     1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
     1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
@@ -125,7 +125,10 @@ std::string computeDeviceStr()
 // PerfTimer
 ///////////////////////////////////////////////////////////////////////////////
 
-/* Requires <windows.h> */
+/**
+ * Used to measure performance (i.e. execution times) of different operations.
+ * Requires <windows.h>
+ **/
 class PerfTimer
 {
 public:
@@ -164,14 +167,14 @@ public:
         std::string unitsStr;
         double divisor;
 
-        if (us < 1000) {                    // microseconds
+        if (us < 1000) {            // microseconds
             unitsStr = "us";
             divisor = 1;
-        } else if (us < 1000000) {          // milliseconds
+        } else if (us < 1000000) {  // milliseconds
             unitsStr = "ms";
             divisor = 1000;
-        } else {
-            unitsStr = "s";                 // seconds
+        } else {                    // seconds
+            unitsStr = "s";
             divisor = 1000000;
         }
 
@@ -203,8 +206,10 @@ struct pixelf_s
 };
 typedef struct pixelf_s pixelf_t;
 
-/* Convert from type to another. */
-
+/**
+ * Convert the floating point representation
+ * to the integer representation.
+ */
 pixel_t pixelf_to_pixel(pixelf_t p)
 {
     return {
@@ -214,6 +219,10 @@ pixel_t pixelf_to_pixel(pixelf_t p)
         (unsigned char)(255.0f * p.alpha)
     };
 }
+/**
+ * Convert the integer representation
+ * to the floating point representation.
+ */
 pixelf_t pixel_to_pixelf(pixel_t p)
 {
     return {
@@ -241,7 +250,7 @@ public:
     MiniOCL *ocl = nullptr;             // Handle to OpenCL wrapper class for parallel execution
 
     /**
-     * Initializes the object and sets color type
+     * Initializes the object and sets color type.
      * E.g. LCT_RGBA, LCT_GREY
      **/
     Image(LodePNGColorType colorType = LCT_RGBA)
@@ -251,6 +260,7 @@ public:
 
     /**
      * In case parallel execution is to be used, an OpenCL (MiniOCL) instance is needed.
+     * This method sets an already initialized MiniOCL object as a property.
      **/
     void setOpenCL(MiniOCL *ocl)
     {
@@ -266,21 +276,29 @@ public:
         this->height = height;
 
         this->image.clear();
-        this->image.resize(4 * this->width * this->height, (unsigned char)0);
+        this->image.resize(this->sizeBytes(), (unsigned char)0);
+        this->image.resize(this->sizeBytes(), (unsigned char)0);
     }
 
     /**
-     * Replaces the current image with given.
+     * Returns the size of the image in bytes.
+     **/
+    size_t sizeBytes()
+    {
+        // TODO: Can we guarantee always having 4 channels?
+        return 4 * sizeof(unsigned char) * this->width * this->height;
+    }
+
+    /**
+     * Replaces the current image with given image @newImage.
+     * The image sizes must match exactly.
      **/
     void replaceImage(std::vector<unsigned char> &newImage)
     {
-        // can only replace with image of same size
         if (newImage.size() != this->image.size())
             throw;
 
-        // this->image <-- newImage[begin, end]
-        // this->image.clear();
-        std::move(newImage.begin(), newImage.end(), this->image.begin());
+        this->image = std::move(newImage);
     }
 
     /**
@@ -325,8 +343,6 @@ public:
      **/
     bool save(const std::string &filename)
     {
-        // cout << this->image.size() << endl;
-
         unsigned err;
         std::vector<unsigned char> png;
 
@@ -353,8 +369,8 @@ public:
     }
 
     /**
-     * Creates a greyscale copy of the image to greyImg and makes the image opaque.
-     * Uses NTSC formula.
+     * Converts the image to grayscale and makes the image opaque.
+     * Uses the NTSC formula.
      **/
     bool convertToGrayscale()
     {
@@ -393,7 +409,6 @@ public:
         }
 
 #endif
-
         // this->colorType = LCT_GREY; // update color type
         cout << "Done." << endl;
         return success;
@@ -438,13 +453,11 @@ public:
 #else /* No parallelization */
 
         // TODO: This implementation could use different edge handling techniques.
-
-        // temporary image where the filtered image will be
         // std::vector<unsigned char> tempImage(4 * width * height);
         Image tempImage;
         tempImage.createEmpty(width, height);
 
-        int d = filter.size / 2; // mask's "edge thickness"
+        int d = filter.size / 2; // kernel's "edge thickness"
 
         for (unsigned int cy = 0; cy < height; cy++)
         {
@@ -470,6 +483,7 @@ public:
                     }
                 }
 
+                // convert back to integers (floats are used in computation)
                 pixel_t pixelInt = {
                     (unsigned char)(newClr.red / filter.divisor),
                     (unsigned char)(newClr.green / filter.divisor),
@@ -549,9 +563,9 @@ public:
 
 
 
-/******************************************************************************
-* MAIN
-******************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+// Main
+///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char *argv[])
 {

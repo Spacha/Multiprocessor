@@ -5,13 +5,16 @@ using std::endl;
 
 MiniOCL::MiniOCL()
 {
-    // initialize class...
+    // initialize the object...
 }
 MiniOCL::~MiniOCL()
 {
-    // Destroy the object, release memory...
+    // destroy the object, release memory...
 }
 
+/**
+ * Initializes OpenCL.
+ **/
 bool MiniOCL::initialize(cl_device_type device_type)
 {
     cl_int err = CL_SUCCESS;
@@ -40,7 +43,9 @@ bool MiniOCL::initialize(cl_device_type device_type)
     return err == CL_SUCCESS;
 }
 
-// bool MiniOCL::buildKernel(const std::string *name, const char **source)
+/**
+ * Reads the kernel source code from a file and builds the kernel.
+ **/
 bool MiniOCL::buildKernel(const char *fileName, const char *kernelName)
 {
     cl_int err = CL_SUCCESS;
@@ -63,6 +68,9 @@ bool MiniOCL::buildKernel(const char *fileName, const char *kernelName)
     return err == CL_SUCCESS;
 }
 
+/**
+ * Executes the initialized and built kernel.
+ **/
 bool MiniOCL::executeKernel(size_t globalWidth, size_t globalHeight, size_t localWidth, size_t localHeight)
 {
     cl_int err = CL_SUCCESS;
@@ -87,6 +95,10 @@ bool MiniOCL::executeKernel(size_t globalWidth, size_t globalHeight, size_t loca
     return err == CL_SUCCESS;
 }
 
+/**
+ * Reads the computing output from the OpenCL kernel
+ * and stores it to the output address.
+ **/
 bool MiniOCL::readOutput()
 {
     cl_int err = CL_SUCCESS;
@@ -100,6 +112,9 @@ bool MiniOCL::readOutput()
     return err == CL_SUCCESS;
 }
 
+/**
+ * Sets a simple value as a kernel argument.
+ **/
 bool MiniOCL::setValue(cl_uint argIndex, void *value, size_t size)
 {
     cl_int err = CL_SUCCESS;
@@ -109,6 +124,9 @@ bool MiniOCL::setValue(cl_uint argIndex, void *value, size_t size)
     return err == CL_SUCCESS;
 }
 
+/**
+ * Sets an input buffer as a kernel argument.
+ **/
 bool MiniOCL::setInputBuffer(cl_uint argIndex, void *data, size_t size)
 {
     cl_int err = CL_SUCCESS;
@@ -123,6 +141,9 @@ bool MiniOCL::setInputBuffer(cl_uint argIndex, void *data, size_t size)
     return err == CL_SUCCESS;
 }
 
+/**
+ * Sets an output buffer as a kernel argument.
+ **/
 bool MiniOCL::setOutputBuffer(cl_uint argIndex, void *data, size_t size)
 {
     cl_int err = CL_SUCCESS;
@@ -134,6 +155,9 @@ bool MiniOCL::setOutputBuffer(cl_uint argIndex, void *data, size_t size)
     return err == CL_SUCCESS;
 }
 
+/**
+ * Sets an input image buffer as a kernel argument.
+ **/
 bool MiniOCL::setInputImageBuffer(cl_uint argIndex, void *data, size_t width, size_t height)
 {
     cl_int err = CL_SUCCESS;
@@ -155,15 +179,12 @@ bool MiniOCL::setInputImageBuffer(cl_uint argIndex, void *data, size_t width, si
     return err == CL_SUCCESS;
 }
 
+/**
+ * Sets an output image buffer as a kernel argument.
+ **/
 bool MiniOCL::setOutputImageBuffer(cl_uint argIndex, void *data, size_t width, size_t height)
 {
     cl_int err = CL_SUCCESS;
-
-    /*
-    this->out = data;
-    this->width = width;
-    this->height = height;
-    */
 
     // Pixel format: RGBA, each pixel channel is unsigned 8-bit integer
     static const cl_image_format format = { CL_RGBA, CL_UNORM_INT8 };
@@ -189,7 +210,7 @@ bool MiniOCL::setOutputImageBuffer(cl_uint argIndex, void *data, size_t width, s
 }
 
 /**
- * Display OpenCL device information.
+ * Displays OpenCL device information.
  */
 bool MiniOCL::displayDeviceInfo(cl_device_id device_id /* = NULL */)
 {
@@ -256,6 +277,9 @@ bool MiniOCL::displayDeviceInfo(cl_device_id device_id /* = NULL */)
     return err == CL_SUCCESS;
 }
 
+/**
+ * Returns last kernel execution time in microseconds.
+ **/
 double MiniOCL::getExecutionTime()
 {
     cl_ulong time_start;
