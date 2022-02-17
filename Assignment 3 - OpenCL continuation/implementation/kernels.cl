@@ -59,7 +59,7 @@ __kernel void filter(__read_only image2d_t in,
 
 	// Calculate the pixel value (in center) by sweeping over the mask
 
-	float4 clr = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+	float4 clr = (float4)(0.0f, 0.0f, 0.0f, 1.0f); // should alpha be 0.0f or 1.0f?
 	int maskIdx = 0;
 
 	for (int x = topLeft.x; x <= btmRight.x; x++)

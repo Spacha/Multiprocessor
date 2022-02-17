@@ -97,6 +97,22 @@ const filter_t gaussianFilter = {
     .mask = gaussianFilterMask
 };
 
+// Emboss filter (5x5)
+const float embossFilterMask[maskSize*maskSize] = {
+     -1.0f,  0.0f, 0.0f, 0.0f, 0.0f,
+      0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+      0.0f,  0.0f, 0.0f, 0.0f, 0.0f,
+      0.0f,  0.0f, 0.0f, 1.0f, 0.0f,
+      0.0f,  0.0f, 0.0f, 0.0f, 1.0f
+};
+const filter_t embossFilter = {
+    .size = maskSize,
+    .divisor = 1.0f,
+    .mask = embossFilterMask
+};
+
+const filter_t filters[] = { meanFilter, gaussianFilter, embossFilter };
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // HELPER FUNCTIONS
@@ -627,7 +643,7 @@ int main(int argc, char *argv[])
 
     // 3. filter image
     ptimer.reset();
-    success = img.filter(gaussianFilter); // meanFilter / gaussianFilter
+    success = img.filter(embossFilter); // meanFilter / gaussianFilter / embossFilter
     ptimer.printTime();
     CHECK_ERROR(success, "Error filtering the image.")
 

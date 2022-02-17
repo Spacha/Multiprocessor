@@ -1,0 +1,50 @@
+                          CPU         CPU OpenCL      GPU OpenCL
+-----------------------------------------------------------------
+       Load + decode    1.068 s        1.072 s         1.064 s 
+Convert to grayscale    425.390 ms     79.090 ms       0.264 ms
+              Filter    2.952 s        394.087 ms      1.114 ms
+       Encode + save    3.037 s        2.968 s         2.965 s 
+       -----------------------------------------------------------------
+               Total    7.482 s        4.513 s         4.030
+
+As exoected, load and save times are more or less constant, as no HW
+acceleration is used. On the other hand, there is a significant
+reduction in computing time when OpenCL was used in image
+transformations, especially on GPU.
+
+
+==== CPU ====
+Loading image... Done.
+Decoding image... Done.
+        => time: 1.072 s
+Image 'img/im0.png', size 2988x2008.
+Transforming image to grayscale... Done.
+        => time: 462.870 ms
+        => Kernel execution time: 79.090 ms
+Encoding image... Done.
+Saving image... Done.
+        => time: 2.998 s
+Filtering image using a mask... Done.
+        => time: 707.082 ms
+        => Kernel execution time: 394.087 ms
+Encoding image... Done.
+Saving image... Done.
+        => time: 2.968 s
+
+==== GPU ====
+Loading image... Done.
+Decoding image... Done.
+        => time: 1.064 s
+Image 'img/im0.png', size 2988x2008.
+Transforming image to grayscale... Done.
+        => time: 107.669 ms
+        => Kernel execution time: 0.264 ms
+Encoding image... Done.
+Saving image... Done.
+        => time: 2.973 s
+Filtering image using a mask... Done.
+        => time: 104.936 ms
+        => Kernel execution time: 1.114 ms
+Encoding image... Done.
+Saving image... Done.
+        => time: 2.965 s

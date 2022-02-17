@@ -1,0 +1,40 @@
+# Stereo Disparity (assignment 4) notes
+
+Let there be a Rect class that represents a rectangle:
+    Rect(topLeft, bottomRight);
+        topLeft     = (x1, y1)
+        bottomRight = (x2, y2)
+        center      = (cx, cy) = ((x1 + x2) / 2, (y1 + y2) / 2)
+
+Let there be a ZNCC class (or method):
+    ZNCC:
+        initialize(image_left, image_right):
+            this->image_left = image_left
+            this->image_right = image_right
+            this->avg_left = this->calcAverage(this->image_left)  // window or image average???
+            this->avg_right = this->calcAverage(this->image_right)
+        calculate(x, y, d):
+            return ...
+
+Basic idea (to my understanding):
+1. Pick a pactch (some smallish square) from left image:
+    patchLeft = Rect((200,100), (300,200)) --> B = 100
+2. Pick the same patch from the right image:
+    patchRight = Rect((200,100), (300,200))
+3. Measure maximum ZNCC (maximum cross-correlation):
+    ZNCC = ZNCC.initialize(image_left, image_right)
+
+    d_limit = 200                           // test this area to the left
+    dx = 1                                  // move 1 pixel at a time
+    d = 0                                   // start from the left patch position (disparity)
+
+    max_correlation = 0.0
+    d_optimal = 0                           // d which had the best (largest) correlation
+
+    while d <= d_max:                       // repeat until a limit is reached
+        correlation = ZNCC.calculate(patchRight.x, patchRight.y, d)
+        if (correlation > max_correlation)  // new optimum found
+            max_correlation = correlation
+            d_optimal = d
+
+        d += dx                             // move patch to the left
