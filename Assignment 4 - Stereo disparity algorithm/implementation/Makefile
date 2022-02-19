@@ -17,4 +17,4 @@ OUT = stereo.exe
 
 all: $(SRC)
 	$(CXX) $(CFLAGS) $(SRC) $(EXT_LIB) -I $(EXT_INC) -o $(OUT)
-	@echo Done.
+	@echo Done. Run using: "stereo.exe img/im0.png img/im1.png"

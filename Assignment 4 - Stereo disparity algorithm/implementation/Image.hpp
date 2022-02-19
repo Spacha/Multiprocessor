@@ -52,6 +52,10 @@ public:
     // image manipulation
     bool convertToGrayscale();
     bool filter(const filter_t &filter);
+    bool resize(size_t width, size_t height);
+    bool calcZNCC();
+    bool crossCheck(Image &left, Image &right);
+    bool occlusionFill();
 
     // helper methods
     void putPixel(unsigned int x, unsigned int y, pixel_t pixel);

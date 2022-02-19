@@ -47,21 +47,16 @@ const char *kernelFileName = "kernels.cl";
 
 const size_t maskSize = 5;
 
-// Mean/averaging filter (5x5)
-const float meanFilterMask[10*10] = {
-    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f
+// Mean filter (5x5)
+const float meanFilterMask[maskSize*maskSize] = {
+     1.0f, 1.0f, 1.0f, 1.0f,  1.0f,
+     1.0f, 1.0f, 1.0f, 1.0f,  1.0f,
+     1.0f, 1.0f, 1.0f, 1.0f,  1.0f,
+     1.0f, 1.0f, 1.0f, 1.0f,  1.0f,
+     1.0f, 1.0f, 1.0f, 1.0f,  1.0f
 };
 const filter_t meanFilter = {
-    .size = 10,
+    .size = maskSize,
     .divisor = 25.0f,
     .mask = meanFilterMask
 };
@@ -127,18 +122,25 @@ std::string computeDeviceStr()
 int main(int argc, char *argv[])
 {
     bool success;
-    Image img;              // holds the image name that is being handled
-    PerfTimer ptimer;       // used for measuring execution time
-    std::string imgName;    // the image name that is being handled
+    PerfTimer ptimer;
+    std::string leftImgName;
+    std::string rightImgName;
 
-    // if an argument is provided, use as image name
-    if (argc > 1)
+    Image leftImg;              // left stereo image
+    Image rightImg;             // right stereo image
+    Image finalImg;             // final image after cross-checking
+
+    const int downscaleFactor = 4;
+
+    // if an arguments are provided, use them as image name
+    if (argc > 2)
     {
-        imgName = argv[1];
+        leftImgName = argv[1];
+        rightImgName = argv[2];
     }
     else
     {
-        cout << "Image name is required as an argument!" << endl;
+        cout << "Left and right image names are required as an argument!" << endl;
         return EXIT_FAILURE;
     }
 
@@ -152,53 +154,85 @@ int main(int argc, char *argv[])
     // initialize OpenCL if necessary
     MiniOCL ocl;
     ocl.initialize(TARGET_DEVICE_TYPE);
-    img.setOpenCL(&ocl);
+    leftImg.setOpenCL(&ocl);
+    rightImg.setOpenCL(&ocl);
 
     ocl.displayDeviceInfo();
 #endif /* USE_OCL */
 
-    // 1. load image from disk
-    ptimer.reset();
-    success = img.load(imgName);
-    ptimer.printTime();
-    cout << "Image '" << imgName << "', size "
-         << img.width << "x" << img.height << "." << endl;
-    CHECK_ERROR(success, "Error loading image from disk.")
+    // 1. Load both images from disk
 
-    // 2. convert the image to grayscale
     ptimer.reset();
-    success = img.convertToGrayscale();
+    success = leftImg.load(leftImgName);
+    CHECK_ERROR(success, "Error loading the left image from disk.")
+    success = rightImg.load(rightImgName);
+    CHECK_ERROR(success, "Error loading the right image from disk.")
     ptimer.printTime();
-    CHECK_ERROR(success, "Error transforming image to grayscale.")
+
+    cout << "Left image '" << leftImgName << "', size "
+         << leftImg.width << "x" << leftImg.height << "." << endl;
+    cout << "Right image '" << rightImgName << "', size "
+         << rightImg.width << "x" << rightImg.height << "." << endl;
+
+    // 2. Downscale (resize) the both images
+
+    const int newWidth = leftImg.width / downscaleFactor;
+    const int newHeight = leftImg.height / downscaleFactor;
+
+    ptimer.reset();
+    success = leftImg.resize(newWidth, newHeight);
+    CHECK_ERROR(success, "Error downscaling the left image.")
+    success = rightImg.resize(newWidth, newHeight);
+    CHECK_ERROR(success, "Error downscaling the right image.")
+    ptimer.printTime();
+
+    cout << "DONEDOS" << endl;
+    return 0;
+
+    // 3. Convert both images to grayscale
+
+    ptimer.reset();
+    success = leftImg.convertToGrayscale();
+    CHECK_ERROR(success, "Error transforming the left image to grayscale.")
+    success = rightImg.convertToGrayscale();
+    CHECK_ERROR(success, "Error transforming the right image to grayscale.")
+    ptimer.printTime();
 
 #ifdef USE_OCL
     // print the actual kernel execution time
     kernelTime = ocl.getExecutionTime();
-    printf("\t=> Kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
+    printf("\t=> Right image kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
 #endif /* USE_OCL */
 
     ptimer.reset();
-    success = img.save("img/gray.png");
+    success = leftImg.save("img/1-gray-l.png");
+    CHECK_ERROR(success, "Error saving the left image to disk.")
+    success = rightImg.save("img/1-gray-r.png");
+    CHECK_ERROR(success, "Error saving the right image to disk.")
     ptimer.printTime();
-    CHECK_ERROR(success, "Error saving image to disk.")
 
-    // 3. filter image
+    // 4. Calculate stereo disparity (ZNCC) for both images
+
     ptimer.reset();
-    success = img.filter(meanFilter); // meanFilter / gaussianFilter / embossFilter
+    success = leftImg.calcZNCC();
+    CHECK_ERROR(success, "Error calculating ZNCC for the left image.")
+    success = rightImg.calcZNCC();
+    CHECK_ERROR(success, "Error calculating ZNCC for the right image.")
     ptimer.printTime();
-    CHECK_ERROR(success, "Error filtering the image.")
 
 #ifdef USE_OCL
     // print the actual kernel execution time
     kernelTime = ocl.getExecutionTime();
-    printf("\t=> Kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
+    printf("\t=> Right image kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
 #endif /* USE_OCL */
 
-    // 4. save filtered image
     ptimer.reset();
-    img.save("img/filtered.png");
+    success = leftImg.save("img/2-disparity-l.png");
+    CHECK_ERROR(success, "Error saving the left image to disk.")
+    success = rightImg.save("img/2-disparity-r.png");
+    CHECK_ERROR(success, "Error saving the right image to disk.")
     ptimer.printTime();
-    CHECK_ERROR(success, "Error saving the image to disk.")
+
 
     return EXIT_SUCCESS;
 }

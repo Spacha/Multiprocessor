@@ -111,6 +111,7 @@ bool Image::load(const std::string &filename)
         (unsigned &)this->width, (unsigned &)this->height, png);
     cout << "Done." << endl;
 
+
     // the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA...
 
     if (err) {
@@ -291,6 +292,42 @@ bool Image::filter(const filter_t &filter)
     cout << "Done." << endl;
     return success;
 }
+
+bool Image::resize(size_t width, size_t height)
+{
+    bool success;
+
+    // ...
+
+    return success;
+
+}
+bool Image::calcZNCC()
+{
+    bool success;
+
+    // ...
+
+    return success;
+
+}
+bool Image::crossCheck(Image &left, Image &right)
+{
+    bool success;
+
+    // ...
+
+    return success;
+}
+bool Image::occlusionFill()
+{
+    bool success;
+
+    // ...
+
+    return success;
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // Helper methods
