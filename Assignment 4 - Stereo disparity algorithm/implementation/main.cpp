@@ -233,43 +233,5 @@ int main(int argc, char *argv[])
     CHECK_ERROR(success, "Error saving the right image to disk.")
     ptimer.printTime();
 
-    // 5. Cross checking
-
-    finalImg.createEmpty(leftImg.width, leftImg.height);
-
-    ptimer.reset();
-    success = finalImg.crossCheck(leftImg, rightImg);
-    CHECK_ERROR(success, "Error in cross checking.")
-    ptimer.printTime();
-
-#ifdef USE_OCL
-    // print the actual kernel execution time
-    kernelTime = ocl.getExecutionTime();
-    printf("\t=> Kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
-#endif /* USE_OCL */
-
-    ptimer.reset();
-    success = finalImg.save("img/3-cross-checked.png");
-    CHECK_ERROR(success, "Error saving image to disk.")
-    ptimer.printTime();
-
-    // 6. Occlusion filling
-
-    ptimer.reset();
-    success = finalImg.occlusionFill();
-    CHECK_ERROR(success, "Error in occlusion filling.")
-    ptimer.printTime();
-
-#ifdef USE_OCL
-    // print the actual kernel execution time
-    kernelTime = ocl.getExecutionTime();
-    printf("\t=> Right image kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
-#endif /* USE_OCL */
-
-    ptimer.reset();
-    success = finalImg.save("img/4-occlusion-filled.png");
-    CHECK_ERROR(success, "Error saving image to disk.")
-    ptimer.printTime();
-
     return EXIT_SUCCESS;
 }

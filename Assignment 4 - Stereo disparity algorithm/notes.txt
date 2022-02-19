@@ -1,5 +1,35 @@
 # Stereo Disparity (assignment 4) notes
 
+# Methods
+
+* ReadImage - Use lodepng.cpp/lodepng.c, lodepng.h libraries to read the input images
+  in RGBA format
+* ResizeImage - Write your custom C/C++ function to downscale the read input RGBA
+  images by 4
+* GrayScaleImage - Write your custom C/C++ function to convert images to gray scale.
+  Save the Gray Scale Images as well and submit them along with the report
+* CalcZNCC - Write your custom C/C++ functions to compute the ZNCC value for pixels
+  as described in the previous section. Save the output image after applying ZNCC and
+  submit it along with the report
+* CrossCheck - Write your custom C/C++ function to applying this post processing
+  functionality. The description regarding this is mentioned under previous section.
+  Save the output image after applying CrossCheck post processing and submit it along
+  with the report
+* OcclusionFill - Write your custom C/C++ function to apply the second post processing
+  functionality. The description regarding this is provided under previous section as well.
+  Save the final output image after applying OcclusionFill post processing and submit it
+  along with the report
+* WriteImage - Use lodepng.cpp/lodepng.c libraries to save the output images at
+  different times of the implementation. Remember to not comment this functionalty
+  while measuring the timing/profiling information of otherfunctions present under this
+  task
+* ProfilingInfo - Provide profiling information on each of these functionalities. You are
+  free to choose to implement this part. Simplest profiling information is the timing
+  information of each of these functionalities. Do observe the time, CPU consumes for
+  each one of them. You can include any analysis on this in your report.
+
+# Algorithm
+
 Let there be a Rect class that represents a rectangle:
     Rect(topLeft, bottomRight);
         topLeft     = (x1, y1)
@@ -17,7 +47,7 @@ Let there be a ZNCC class (or method):
             return ...
 
 Basic idea (to my understanding):
-1. Pick a pactch (some smallish square) from left image:
+1. Pick a patch (some smallish square) from left image:
     patchLeft = Rect((200,100), (300,200)) --> B = 100
 2. Pick the same patch from the right image:
     patchRight = Rect((200,100), (300,200))
