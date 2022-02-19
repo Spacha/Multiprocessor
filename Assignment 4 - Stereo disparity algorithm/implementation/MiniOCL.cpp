@@ -3,7 +3,9 @@
 using std::cout;
 using std::endl;
 
-MiniOCL::MiniOCL()
+MiniOCL::MiniOCL(const char* kernelFileName)
+    : kernelFileName(kernelFileName), device_type(), outImg(), platform(),
+      device_id(), context(), queue(), program(), kernel(), kernelEvent()
 {
     // initialize the object...
 }
@@ -46,12 +48,12 @@ bool MiniOCL::initialize(cl_device_type device_type)
 /**
  * Reads the kernel source code from a file and builds the kernel.
  **/
-bool MiniOCL::buildKernel(const char *fileName, const char *kernelName)
+bool MiniOCL::buildKernel(const char *kernelName)
 {
     cl_int err = CL_SUCCESS;
 
     // read the kernel source from the file
-    std::ifstream kernelFile(fileName);
+    std::ifstream kernelFile(kernelFileName);
     std::string source(std::istreambuf_iterator<char>(kernelFile), (std::istreambuf_iterator<char>()));
 
     // create the compute program from the source buffer
@@ -243,28 +245,29 @@ bool MiniOCL::displayDeviceInfo(cl_device_id device_id /* = NULL */)
     err |= clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(workgroup_size), &workgroup_size, NULL);
 
     // translate device type id to text
-    char dev_type_str[16];
+    //char dev_type_str[16];
+    std::string dev_type_str;
     switch (dev_type)
     {
     case CL_DEVICE_TYPE_DEFAULT:
-        strcpy(dev_type_str, "Default");
+        dev_type_str = "Default";
         break;
     case CL_DEVICE_TYPE_CPU:
-        strcpy(dev_type_str, "CPU");
+        dev_type_str = "CPU";
         break;
     case CL_DEVICE_TYPE_GPU:
-        strcpy(dev_type_str, "GPU");
+        dev_type_str = "GPU";
         break;
     case CL_DEVICE_TYPE_ACCELERATOR:
-        strcpy(dev_type_str, "Accelerator");
+        dev_type_str = "Accelerator";
         break;
     default:
-        strcpy(dev_type_str, "Unknown");
+        dev_type_str = "Unknown";
         break;
     }
 
     printf("\tDevice name:                   %s\n", dev_name);
-    printf("\tDevice type:                   %s\n", dev_type_str);
+    printf("\tDevice type:                   %s\n", dev_type_str.c_str());
     printf("\tVendor ID:                     %u\n", vendor_id);
     printf("\tMaximum frequency:             %u MHz\n", max_freq);
     printf("\tDriver version:                %s\n", driver_version);

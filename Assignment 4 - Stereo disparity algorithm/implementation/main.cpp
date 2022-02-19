@@ -6,16 +6,6 @@
 using std::cout;
 using std::endl;
 
-///////////////////////////////////////////////////////////////////////////////
-// Parameters:
-///////////////////////////////////////////////////////////////////////////////
-
-// COMPUTE_DEVICE options:
-//  TARGET_NONE = Sequential - don't use OpenCL
-//  TARGET_GPU  = OpenCL on GPU
-//  TARGET_CPU  = OpenCL on CPU
-#define COMPUTE_DEVICE TARGET_GPU
-
 /**
  * Compile & run:
  *   cls && g++ main.cpp MiniOCL.cpp lodepng.cpp %OCL_ROOT%/lib/x86_64/opencl.lib -Wall -I %OCL_ROOT%\include -o image-filter.exe && image-filter.exe img/im0.png
@@ -55,11 +45,7 @@ const float meanFilterMask[maskSize*maskSize] = {
      1.0f, 1.0f, 1.0f, 1.0f,  1.0f,
      1.0f, 1.0f, 1.0f, 1.0f,  1.0f
 };
-const filter_t meanFilter = {
-    .size = maskSize,
-    .divisor = 25.0f,
-    .mask = meanFilterMask
-};
+const Filter meanFilter(maskSize, 25.0f, meanFilterMask);
 
 // Gaussian filter (5x5)
 const float gaussianFilterMask[maskSize*maskSize] = {
@@ -69,11 +55,7 @@ const float gaussianFilterMask[maskSize*maskSize] = {
      4.0f, 16.0f, 26.0f, 16.0f,  4.0f,
      1.0f,  4.0f,  7.0f,  4.0f,  1.0f
 };
-const filter_t gaussianFilter = {
-    .size = maskSize,
-    .divisor = 273.0f,
-    .mask = gaussianFilterMask
-};
+const Filter gaussianFilter(maskSize, 273.0f, gaussianFilterMask);
 
 // Emboss filter (5x5)
 const float embossFilterMask[maskSize*maskSize] = {
@@ -83,13 +65,9 @@ const float embossFilterMask[maskSize*maskSize] = {
       0.0f,  0.0f, 0.0f, 1.0f, 0.0f,
       0.0f,  0.0f, 0.0f, 0.0f, 1.0f
 };
-const filter_t embossFilter = {
-    .size = maskSize,
-    .divisor = 1.0f,
-    .mask = embossFilterMask
-};
+const Filter embossFilter(maskSize, 1.0f, embossFilterMask);
 
-const filter_t filters[] = { meanFilter, gaussianFilter, embossFilter };
+const Filter filters[] = { meanFilter, gaussianFilter, embossFilter };
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -152,7 +130,7 @@ int main(int argc, char *argv[])
     double kernelTime;
 
     // initialize OpenCL if necessary
-    MiniOCL ocl;
+    MiniOCL ocl(kernelFileName);
     ocl.initialize(TARGET_DEVICE_TYPE);
     leftImg.setOpenCL(&ocl);
     rightImg.setOpenCL(&ocl);
@@ -185,9 +163,6 @@ int main(int argc, char *argv[])
     success = rightImg.resize(newWidth, newHeight);
     CHECK_ERROR(success, "Error downscaling the right image.")
     ptimer.printTime();
-
-    cout << "DONEDOS" << endl;
-    return 0;
 
     // 3. Convert both images to grayscale
 

@@ -3,33 +3,6 @@
 using std::cout;
 using std::endl;
 
-/**
- * Convert the floating point representation
- * to the integer representation.
- */
-pixel_t pixelf_to_pixel(pixelf_t p)
-{
-    return {
-        (unsigned char)(255.0f * p.red),
-        (unsigned char)(255.0f * p.green),
-        (unsigned char)(255.0f * p.blue),
-        (unsigned char)(255.0f * p.alpha)
-    };
-}
-/**
- * Convert the integer representation
- * to the floating point representation.
- */
-pixelf_t pixel_to_pixelf(pixel_t p)
-{
-    return {
-        (float)(  p.red / 255.0f),
-        (float)(p.green / 255.0f),
-        (float)( p.blue / 255.0f),
-        (float)(p.alpha / 255.0f)
-    };
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // Image
 ///////////////////////////////////////////////////////////////////////////////
@@ -38,9 +11,9 @@ pixelf_t pixel_to_pixelf(pixel_t p)
  * Initializes the object and sets color type.
  * E.g. LCT_RGBA, LCT_GREY
  **/
-Image::Image(LodePNGColorType colorType /* = LCT_RGBA */)
+Image::Image() : width(0), height(0)
 {
-    this->colorType = colorType;
+    // ...
 }
 
 /**
@@ -175,7 +148,7 @@ bool Image::convertToGrayscale()
 
     // set up OpenCL for execution
 
-    success = ocl->buildKernel(kernelFileName, "grayscale");
+    success = ocl->buildKernel("grayscale");
 
     ocl->setInputImageBuffer(
         0, static_cast<void *>(image.data()), width, height);   // image in
@@ -190,7 +163,7 @@ bool Image::convertToGrayscale()
     {
         for (unsigned int x = 0; x < this->width; x++)
         {
-            pixel_t p = this->getPixel(x, y);
+            Pixel p = this->getPixel(x, y);
 
             // replace the pixel with a gray one
             this->putPixel(x, y, ceil(0.299*p.red + 0.587*p.green + 0.114*p.blue));
@@ -198,7 +171,6 @@ bool Image::convertToGrayscale()
     }
 
 #endif
-    // this->colorType = LCT_GREY; // update color type
     cout << "Done." << endl;
     return success;
 }
@@ -206,7 +178,7 @@ bool Image::convertToGrayscale()
 /**
  * Filters the image using the given mask.
  **/
-bool Image::filter(const filter_t &filter)
+bool Image::filter(const Filter &filter)
 {
     bool success = true;
     cout << "Filtering image using a mask... ";
@@ -224,7 +196,7 @@ bool Image::filter(const filter_t &filter)
         return false;
     }
 
-    success = this->ocl->buildKernel(kernelFileName, "filter");
+    success = this->ocl->buildKernel("filter");
 
     ocl->setInputImageBuffer(
         0, static_cast<void *>(image.data()), width, height);               // image in
@@ -253,7 +225,7 @@ bool Image::filter(const filter_t &filter)
         for (unsigned int cx = 0; cx < width; cx++)
         {
             unsigned int weight = 0;
-            pixelf_t newClr = { 0.0f, 0.0f, 0.0f, 255.0f };
+            Pixel newClr = Pixel(0.0f, 0.0f, 0.0f, 255.0f);
 
             // iterate over each element in the mask
             for (int y = cy - d; y <= (int)(cy + d); y++)
@@ -261,9 +233,9 @@ bool Image::filter(const filter_t &filter)
                 for (int x = cx - d; x <= (int)(cx + d); x++)
                 {
                     // get pixel if within image
-                    pixel_t p = validCoordinates(x, y)
-                        ? this->getPixel(x, y)
-                        : (pixel_t){ 0, 0, 0, 0 };
+                    Pixel p(0, 0, 0, 0);                          // SHOULD USE FLOAT HERE
+                    if (validCoordinates(x, y))
+                        p = this->getPixel(x, y);
 
                     newClr.red   += filter.mask[weight] * (float)p.red;
                     newClr.green += filter.mask[weight] * (float)p.green;
@@ -273,12 +245,12 @@ bool Image::filter(const filter_t &filter)
             }
 
             // convert back to integers (floats are used in computation)
-            pixel_t pixelInt = {
+            Pixel pixelInt(
                 (unsigned char)(newClr.red / filter.divisor),
                 (unsigned char)(newClr.green / filter.divisor),
                 (unsigned char)(newClr.blue / filter.divisor),
                 (unsigned char)(newClr.alpha)
-            };
+            );
 
             // replace the pixel in the center of the mask
             tempImage.putPixel(cx, cy, pixelInt);
@@ -298,7 +270,7 @@ bool Image::resize(size_t width, size_t height)
     bool success;
 
     // ...
-    success = false;
+    success = true;
 
     return success;
 
@@ -308,7 +280,7 @@ bool Image::calcZNCC()
     bool success;
 
     // ...
-    success = false;
+    success = true;
 
     return success;
 
@@ -318,7 +290,7 @@ bool Image::crossCheck(Image &left, Image &right)
     bool success;
 
     // ...
-    success = false;
+    success = true;
 
     return success;
 }
@@ -327,7 +299,7 @@ bool Image::occlusionFill()
     bool success;
 
     // ...
-    success = false;
+    success = true;
 
     return success;
 }
@@ -340,12 +312,14 @@ bool Image::occlusionFill()
 /**
  * Puts given RGBA (4 channel) pixel to position (x,y).
  **/
-void Image::putPixel(unsigned int x, unsigned int y, pixel_t pixel)
+void Image::putPixel(unsigned int x, unsigned int y, Pixel pixel)
 {
     if (!validCoordinates(x, y))
         throw;
 
-    unsigned int i = 4*(y*width + x);
+    // unsigned int i = 4*(y*width + x);
+    const __int64 i = 4 * (y * width + x);
+
     this->image[i]   = pixel.red;
     this->image[i+1] = pixel.green;
     this->image[i+2] = pixel.blue;
@@ -357,7 +331,7 @@ void Image::putPixel(unsigned int x, unsigned int y, pixel_t pixel)
  **/
 void Image::putPixel(unsigned int x, unsigned int y, unsigned char grey)
 {
-    pixel_t pixel = { grey, grey, grey, 0xff};
+    Pixel pixel(grey, grey, grey, 0xff);
     this->putPixel(x, y, pixel);
 }
 
@@ -365,13 +339,14 @@ void Image::putPixel(unsigned int x, unsigned int y, unsigned char grey)
  * Returns a pixel struct containing the color values
  * of each pixel in position (x,y).
  **/
-pixel_t Image::getPixel(unsigned int x, unsigned int y)
+Pixel Image::getPixel(unsigned int x, unsigned int y)
 {
     if (!validCoordinates(x, y))
         throw;
 
     // RGBA
-    unsigned int i = 4*(y*width + x);
+    // unsigned int i = 4*(y*width + x);
+    const __int64 i = 4 * (y * width + x);
     return { image[i], image[i+1], image[i+2], image[i+3] };
 }
 
@@ -380,7 +355,7 @@ pixel_t Image::getPixel(unsigned int x, unsigned int y)
  **/
 void Image::printPixel(unsigned int x, unsigned int y)
 {
-    pixel_t pixel = getPixel(x, y);
+    Pixel pixel = getPixel(x, y);
     printf("Pixel (%u, %u):\tRGBA: #%02x%02x%02x%02x\n", x, y, pixel.red, pixel.green, pixel.blue, pixel.alpha);
 }
 

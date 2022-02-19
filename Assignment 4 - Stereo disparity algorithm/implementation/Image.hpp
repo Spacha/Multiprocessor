@@ -5,24 +5,19 @@
 #include "lodepng.h"
 
 /* Struct representing a pixel (0-255) */
-struct pixel_s
+struct Pixel
 {
     unsigned char red;
     unsigned char green;
     unsigned char blue;
     unsigned char alpha;
+
+    Pixel(unsigned char red, unsigned char green, unsigned char blue, unsigned char alpha)
+        : red(red), green(green), blue(blue), alpha(alpha) {}
 };
-typedef struct pixel_s pixel_t;
+typedef struct Pixel Pixel;
 
 /* Same struct but as float (0.0f - 1.0f) */
-struct pixelf_s
-{
-    float red;
-    float green;
-    float blue;
-    float alpha;
-};
-typedef struct pixelf_s pixelf_t;
 
 /**
  * This is my wrapper for lodepng.h that simplifies the handling of PNGs a lot.
@@ -36,10 +31,9 @@ public:
     std::string name;                   // image file name
     size_t width;                       // image width
     size_t height;                      // image height
-    LodePNGColorType colorType;         // color type (see LodePNGColorType in lodepng.h)
     MiniOCL *ocl = nullptr;             // Handle to OpenCL wrapper class for parallel execution
 
-    Image(LodePNGColorType colorType = LCT_RGBA);
+    Image();
     ~Image();
     void setOpenCL(MiniOCL *ocl);
 
@@ -51,16 +45,16 @@ public:
 
     // image manipulation
     bool convertToGrayscale();
-    bool filter(const filter_t &filter);
+    bool filter(const Filter &filter);
     bool resize(size_t width, size_t height);
     bool calcZNCC();
     bool crossCheck(Image &left, Image &right);
     bool occlusionFill();
 
     // helper methods
-    void putPixel(unsigned int x, unsigned int y, pixel_t pixel);
+    void putPixel(unsigned int x, unsigned int y, Pixel pixel);
     void putPixel(unsigned int x, unsigned int y, unsigned char grey);
-    pixel_t getPixel(unsigned int x, unsigned int y);
+    Pixel getPixel(unsigned int x, unsigned int y);
     void printPixel(unsigned int x, unsigned int y);
 
     size_t sizeBytes();
