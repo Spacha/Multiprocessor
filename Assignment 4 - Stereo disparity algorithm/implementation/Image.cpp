@@ -298,6 +298,7 @@ bool Image::resize(size_t width, size_t height)
     bool success;
 
     // ...
+    success = false;
 
     return success;
 
@@ -307,6 +308,7 @@ bool Image::calcZNCC()
     bool success;
 
     // ...
+    success = false;
 
     return success;
 
@@ -316,6 +318,7 @@ bool Image::crossCheck(Image &left, Image &right)
     bool success;
 
     // ...
+    success = false;
 
     return success;
 }
@@ -324,6 +327,7 @@ bool Image::occlusionFill()
     bool success;
 
     // ...
+    success = false;
 
     return success;
 }
