@@ -8,17 +8,16 @@ using std::endl;
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- * Initializes the object and sets color type.
- * E.g. LCT_RGBA, LCT_GREY
- **/
+ * Initializes the object.
+ */
 Image::Image() : width(0), height(0)
 {
     // ...
 }
 
 /**
- * Destructs the object.
- **/
+ * Destructs the object and cleans up after itself.
+ */
 Image::~Image()
 {
     // ...
@@ -27,15 +26,21 @@ Image::~Image()
 /**
  * In case parallel execution is to be used, an OpenCL (MiniOCL) instance is needed.
  * This method sets an already initialized MiniOCL object as a property.
- **/
+ * 
+ * @param ocl Initiated instance of MiniOCL for parallel processing.
+ */
 void Image::setOpenCL(MiniOCL *ocl)
 {
     this->ocl = ocl;
 }
 
 /**
- * Creates an empty image of given size.
- **/
+ * Creates an empty image of given image. Image will
+ * contain only transparent balck pixels.
+ * 
+ * @param width  Image width
+ * @param height Image height
+ */
 void Image::createEmpty(size_t width, size_t height)
 {
     this->width = width;
@@ -49,7 +54,9 @@ void Image::createEmpty(size_t width, size_t height)
 /**
  * Replaces the current image with given image @newImage.
  * The image sizes must match exactly.
- **/
+ * 
+ * @param newImage Image that will replace the current image. Must be the same size.
+ */
 void Image::replaceImage(std::vector<unsigned char> &newImage)
 {
     if (newImage.size() != this->image.size())
@@ -62,6 +69,14 @@ void Image::replaceImage(std::vector<unsigned char> &newImage)
  * Load PNG file from disk to memory first, then decode to raw pixels in memory.
  * Returns true on success, false on fail.
  **/
+
+/**
+ * Load PNG file from disk to memory first, then decode to raw pixels in memory.
+ * Returns true on success, false on fail.
+ * 
+ * @param filename Name of the image file to be loaded.
+ * @return         True on success, false on fail.
+ */
 bool Image::load(const std::string &filename)
 {
     this->name = filename;
@@ -98,7 +113,10 @@ bool Image::load(const std::string &filename)
 /**
  * Encode PNG and save it to the disk.
  * Returns true on success, false on fail.
- **/
+ * 
+ * @param filename Name of the file to be saved.
+ * @return         True on success, false on fail.
+ */
 bool Image::save(const std::string &filename)
 {
     unsigned err;
@@ -132,8 +150,11 @@ bool Image::save(const std::string &filename)
 
 /**
  * Converts the image to grayscale and makes the image opaque.
- * Uses the NTSC formula.
- **/
+ * Uses the NTSC formula. Depending on the flags, this can use parallel
+ * processing to significantly speed up.
+ * 
+ * @return True on success, false on fail.
+ */
 bool Image::convertToGrayscale()
 {
     bool success = true;
@@ -177,7 +198,10 @@ bool Image::convertToGrayscale()
 
 /**
  * Filters the image using the given mask.
- **/
+ * 
+ * @param filter Filter to be applied to the image.
+ * @return       True on success, false on fail.
+ */
 bool Image::filter(const Filter &filter)
 {
     bool success = true;
@@ -214,7 +238,6 @@ bool Image::filter(const Filter &filter)
 #else /* No parallelization */
 
     // TODO: This implementation could use different edge handling techniques.
-    // std::vector<unsigned char> tempImage(4 * width * height);
     Image tempImage;
     tempImage.createEmpty(width, height);
 
@@ -233,7 +256,7 @@ bool Image::filter(const Filter &filter)
                 for (int x = cx - d; x <= (int)(cx + d); x++)
                 {
                     // get pixel if within image
-                    Pixel p(0, 0, 0, 0);                          // SHOULD USE FLOAT HERE
+                    Pixel p(0, 0, 0, 0);
                     if (validCoordinates(x, y))
                         p = this->getPixel(x, y);
 
@@ -244,19 +267,13 @@ bool Image::filter(const Filter &filter)
                 }
             }
 
-            // convert back to integers (floats are used in computation)
-            Pixel pixelInt(
-                (unsigned char)(newClr.red / filter.divisor),
-                (unsigned char)(newClr.green / filter.divisor),
-                (unsigned char)(newClr.blue / filter.divisor),
-                (unsigned char)(newClr.alpha)
-            );
 
             // replace the pixel in the center of the mask
-            tempImage.putPixel(cx, cy, pixelInt);
+            tempImage.putPixel(cx, cy, p / filter.divisor);
         }
     }
 
+    cout << "Check if can divide alpha too, then REMOVE THIS COMMENT" << endl;
     // update the image
     this->replaceImage(tempImage.image);
 
@@ -265,6 +282,14 @@ bool Image::filter(const Filter &filter)
     return success;
 }
 
+/**
+ * Resizes the image to desired dimensions using
+ * a simple filter + downsample technique.
+ * 
+ * @param width New image width.
+ * @param width New image height.
+ * @return      True on success, false on fail.
+ */
 bool Image::resize(size_t width, size_t height)
 {
     bool success;
@@ -272,24 +297,48 @@ bool Image::resize(size_t width, size_t height)
     // ...
     success = true;
 
+    // this->filter(g_filters->meanFilter);
+    // this->width = width;
+    // this->height = height;
+
     return success;
 
 }
-bool Image::calcZNCC()
+/**
+ * Calculates the disparity map of the image compared to
+ * another image. The disparity map replaces the current image.
+ * 
+ * @param otherImage The image to be compared against.
+ * @return           A pointer to an image containing the disparity map.
+ */
+Image &Image::calcZNCC(Image &otherImg)
 {
-    bool success;
+    Image disparityMap;
+    disparityMap->createEmpty(otherImg.width, otherImg.height);
 
-    // ...
-    success = true;
-
-    return success;
+    return &disparityMap; // return a pointer
 
 }
+
+/**
+ * Performs a cross-checking for two disparity maps of the same size.
+ * The result is stored as an image.
+ * 
+ * @param left   The left-to-right disparity map.
+ * @param right  The right-to-left disparity map.
+ * @return       True on success, false on fail.
+ */
 bool Image::crossCheck(Image &left, Image &right)
 {
     bool success;
 
-    // ...
+    // the disparity maps must be exactly the same size
+    if (left->width != right->width || left->height != right->height)
+        return false;
+
+    this->createEmpty(left->width, left->height);
+
+    // Do some magic, will ya?
     success = true;
 
     return success;

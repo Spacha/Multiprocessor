@@ -188,11 +188,54 @@ int main(int argc, char *argv[])
 
     // 4. Calculate stereo disparity (ZNCC) for both images
 
+    Image *leftDispImg;      // contains the left-to-right disparity map
+    Image *rightDispImg;     // contains the right-to-left disparity map
+
     ptimer.reset();
-    success = leftImg.calcZNCC();
-    CHECK_ERROR(success, "Error calculating ZNCC for the left image.")
-    success = rightImg.calcZNCC();
-    CHECK_ERROR(success, "Error calculating ZNCC for the right image.")
+    leftDispImg = leftImg.calcZNCC(rightImg); // TODO: error checking for these?
+    rightDispImg = rightImg.calcZNCC(leftImg);
+    ptimer.printTime();
+
+    // these have become unnecessary at this point
+    delete leftImg;
+    delete rightImg;
+
+    // TODO: If we use OCL, put benchmark here.
+
+    ptimer.reset();
+    success = leftDispImg->save("img/2-disparity-l.png");
+    CHECK_ERROR(success, "Error saving the left image to disk.")
+    success = rightDispImg->save("img/2-disparity-r.png");
+    CHECK_ERROR(success, "Error saving the right image to disk.")
+    ptimer.printTime();
+
+    // 5. Cross checking
+
+    ptimer.reset();
+    finalImg.crossCheck(leftDispImg, rightDispImg);
+    CHECK_ERROR(success, "Error in cross checking.")
+    ptimer.printTime();
+
+    // these have become unnecessary at this point
+    delete leftDispImg;
+    delete rightDispImg;
+
+#ifdef USE_OCL
+    // print the actual kernel execution time
+    kernelTime = ocl.getExecutionTime();
+    printf("\t=> Kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
+#endif /* USE_OCL */
+
+    ptimer.reset();
+    success = finalImg.save("img/3-cross-checked.png");
+    CHECK_ERROR(success, "Error saving image to disk.")
+    ptimer.printTime();
+
+    // 6. Occlusion filling
+
+    ptimer.reset();
+    success = finalImg.occlusionFill();
+    CHECK_ERROR(success, "Error in occlusion filling.")
     ptimer.printTime();
 
 #ifdef USE_OCL
@@ -202,11 +245,13 @@ int main(int argc, char *argv[])
 #endif /* USE_OCL */
 
     ptimer.reset();
-    success = leftImg.save("img/2-disparity-l.png");
-    CHECK_ERROR(success, "Error saving the left image to disk.")
-    success = rightImg.save("img/2-disparity-r.png");
-    CHECK_ERROR(success, "Error saving the right image to disk.")
+    success = finalImg.save("img/4-occlusion-filled.png");
+    CHECK_ERROR(success, "Error saving image to disk.")
     ptimer.printTime();
+
+    // cleanup
+    delete finalImg;
+    ocl->cleanup();
 
     return EXIT_SUCCESS;
 }

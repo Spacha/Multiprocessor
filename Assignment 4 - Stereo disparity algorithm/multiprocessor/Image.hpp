@@ -14,6 +14,20 @@ struct Pixel
 
     Pixel(unsigned char red, unsigned char green, unsigned char blue, unsigned char alpha)
         : red(red), green(green), blue(blue), alpha(alpha) {}
+
+    /**
+     * Overloads the division operator between Pixel and a float.
+     * Values of R, G and B are divided but A is not.
+     */
+    Pixel operator/(const float divisor)
+    {
+        return Pixel(
+            (unsigned char)(this->red   / divisor),
+            (unsigned char)(this->green / divisor),
+            (unsigned char)(this->blue  / divisor),
+            (unsigned char)(this->alpha)
+        );
+    }
 };
 typedef struct Pixel Pixel;
 
@@ -47,7 +61,7 @@ public:
     bool convertToGrayscale();
     bool filter(const Filter &filter);
     bool resize(size_t width, size_t height);
-    bool calcZNCC();
+    Image *calcZNCC(Image &otherImg);
     bool crossCheck(Image &left, Image &right);
     bool occlusionFill();
 

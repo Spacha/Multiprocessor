@@ -3,12 +3,21 @@
 using std::cout;
 using std::endl;
 
+/**
+ * Initializes the object.
+ * 
+ * @param kernelFileName Name of the file that contains the kernel code.
+ */
 MiniOCL::MiniOCL(const char* kernelFileName)
     : kernelFileName(kernelFileName), device_type(), outImg(), platform(),
       device_id(), context(), queue(), program(), kernel(), kernelEvent()
 {
     // initialize the object...
 }
+
+/**
+ * Destroys the object and cloeans up OpenCL.
+ */
 MiniOCL::~MiniOCL()
 {
     // destroy the object, release memory...
@@ -16,7 +25,9 @@ MiniOCL::~MiniOCL()
 
 /**
  * Initializes OpenCL.
- **/
+ * 
+ * @param device_type OpenCL device type.
+ */
 bool MiniOCL::initialize(cl_device_type device_type)
 {
     cl_int err = CL_SUCCESS;
@@ -47,7 +58,9 @@ bool MiniOCL::initialize(cl_device_type device_type)
 
 /**
  * Reads the kernel source code from a file and builds the kernel.
- **/
+ * 
+ * @param kernelName Name of the kernel function to be used.
+ */
 bool MiniOCL::buildKernel(const char *kernelName)
 {
     cl_int err = CL_SUCCESS;
@@ -72,7 +85,14 @@ bool MiniOCL::buildKernel(const char *kernelName)
 
 /**
  * Executes the initialized and built kernel.
- **/
+ * 
+ * @param globalWidth   Global width of the image.
+ * @param globalHeight  Global height of the image.
+ * @param localWidth    Local width of the image.
+ * @param localHeight   Local width of the image.
+ * 
+ * @return              True on success, false on fail.
+ */
 bool MiniOCL::executeKernel(size_t globalWidth, size_t globalHeight, size_t localWidth, size_t localHeight)
 {
     cl_int err = CL_SUCCESS;
@@ -100,7 +120,9 @@ bool MiniOCL::executeKernel(size_t globalWidth, size_t globalHeight, size_t loca
 /**
  * Reads the computing output from the OpenCL kernel
  * and stores it to the output address.
- **/
+ * 
+ * @return True on success, false on fail.
+ */
 bool MiniOCL::readOutput()
 {
     cl_int err = CL_SUCCESS;
@@ -116,7 +138,12 @@ bool MiniOCL::readOutput()
 
 /**
  * Sets a simple value as a kernel argument.
- **/
+ * 
+ * @param argIndex Argument index.
+ * @param value    Pointer to the value to be bound to the argument.
+ * @param size     Value data size in bytes.
+ * @return         True on success, false on fail.
+ */
 bool MiniOCL::setValue(cl_uint argIndex, void *value, size_t size)
 {
     cl_int err = CL_SUCCESS;
@@ -128,7 +155,12 @@ bool MiniOCL::setValue(cl_uint argIndex, void *value, size_t size)
 
 /**
  * Sets an input buffer as a kernel argument.
- **/
+ * 
+ * @param argIndex Argument index.
+ * @param data     Pointer to the buffer to be bound to the argument.
+ * @param size     Buffer size in bytes.
+ * @return         True on success, false on fail.
+ */
 bool MiniOCL::setInputBuffer(cl_uint argIndex, void *data, size_t size)
 {
     cl_int err = CL_SUCCESS;
@@ -145,7 +177,14 @@ bool MiniOCL::setInputBuffer(cl_uint argIndex, void *data, size_t size)
 
 /**
  * Sets an output buffer as a kernel argument.
- **/
+ * 
+ * @note           Not implemented.
+ * 
+ * @param argIndex Argument index.
+ * @param data     Pointer to the buffer to be bound to the argument.
+ * @param size     Buffer size in bytes.
+ * @return         True on success, false on fail.
+ */
 bool MiniOCL::setOutputBuffer(cl_uint argIndex, void *data, size_t size)
 {
     cl_int err = CL_SUCCESS;
@@ -159,7 +198,13 @@ bool MiniOCL::setOutputBuffer(cl_uint argIndex, void *data, size_t size)
 
 /**
  * Sets an input image buffer as a kernel argument.
- **/
+ * 
+ * @param argIndex Argument index.
+ * @param data     Pointer to the image to be bound to the argument.
+ * @param size     Image width.
+ * @param size     Image height.
+ * @return         True on success, false on fail.
+ */
 bool MiniOCL::setInputImageBuffer(cl_uint argIndex, void *data, size_t width, size_t height)
 {
     cl_int err = CL_SUCCESS;
@@ -183,7 +228,13 @@ bool MiniOCL::setInputImageBuffer(cl_uint argIndex, void *data, size_t width, si
 
 /**
  * Sets an output image buffer as a kernel argument.
- **/
+ * 
+ * @param argIndex Argument index.
+ * @param data     Pointer to the image to be bound to the argument.
+ * @param size     Image width.
+ * @param size     Image height.
+ * @return         True on success, false on fail.
+ */
 bool MiniOCL::setOutputImageBuffer(cl_uint argIndex, void *data, size_t width, size_t height)
 {
     cl_int err = CL_SUCCESS;
@@ -213,6 +264,9 @@ bool MiniOCL::setOutputImageBuffer(cl_uint argIndex, void *data, size_t width, s
 
 /**
  * Displays OpenCL device information.
+ * 
+ * @param device_id OpenCL device ID. If NULL, the current device ID is used.
+ * @return          True on success, false on fail.
  */
 bool MiniOCL::displayDeviceInfo(cl_device_id device_id /* = NULL */)
 {
@@ -282,6 +336,8 @@ bool MiniOCL::displayDeviceInfo(cl_device_id device_id /* = NULL */)
 
 /**
  * Returns last kernel execution time in microseconds.
+ * 
+ * @return The execution time in microseconds.
  **/
 double MiniOCL::getExecutionTime()
 {

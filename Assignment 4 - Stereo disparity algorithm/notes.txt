@@ -28,6 +28,32 @@
   information of each of these functionalities. Do observe the time, CPU consumes for
   each one of them. You can include any analysis on this in your report.
 
+# Overview
+
+leftImg = load(im0)
+rightImg = load(im1)
+
+leftImg = leftImg.resize()
+rightImg = rightImg.resize()
+
+leftImg = leftImg.grayscale()
+rightImg = rightImg.grayscale()
+leftImg.save(1-gray-l)
+rightImg.save(1-gray-r)
+
+leftDispImg = leftImg.calcZNCC(rightImg)
+rightDispImg = rightImg.calcZNCC(rightImg)
+del leftImg, rightImg
+leftDispImg.save(2-disp-l)
+rightDispImg.save(2-disp-r)
+
+finalImg = leftDispImg.crossCheck(rightImg)
+finalImg.save(3-cross-checked)
+
+finalImg = finalImg.occlusionFill()
+finalImg.save(4-occlusion-filled)
+
+
 # Algorithm
 
 Let there be a Rect class that represents a rectangle:
