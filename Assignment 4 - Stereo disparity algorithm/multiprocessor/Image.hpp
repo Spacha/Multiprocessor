@@ -29,6 +29,15 @@ struct Pixel
             (unsigned char)(this->alpha)
         );
     }
+
+    /**
+     * Returns true if the pixel is a zero pixel, i.e. all channels are zero.
+     */
+    bool isZero()
+    {
+        return this->red   == 0 && this->green == 0 &&
+               this->blue  == 0 && this->alpha == 0;
+    }
 };
 typedef struct Pixel Pixel;
 
@@ -71,5 +80,6 @@ public:
     void printPixel(unsigned int x, unsigned int y);
 
     size_t sizeBytes();
+    unsigned char grayAverage();
     bool validCoordinates(unsigned int x, unsigned int y);
 };

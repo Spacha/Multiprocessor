@@ -306,6 +306,7 @@ bool Image::resize(size_t width, size_t height)
     return success;
 
 }
+
 /**
  * Calculates the disparity map of the image compared to
  * another image. The disparity map replaces the current image.
@@ -320,6 +321,12 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
     cout << "Calculating ZNCC... ";
 
     disparityMap->createEmpty(otherImg.width, otherImg.height);
+
+    unsigned char leftAvg = this->grayAverage();
+    unsigned char rightAvg = otherImg.grayAverage();
+
+    //printf("Left average: %u\n", leftAvg);
+    //printf("Right average: %u\n", rightAvg);
 
     // Do the magic...
     success = true;
@@ -339,6 +346,45 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
  */
 bool Image::crossCheck(Image &left, Image &right)
 {
+    /*
+    The LEFT disparity map is obtained by mapping the image on the left against the one
+    on the right.
+    The RIGHT disparity map is obtained analogously by mapping the image on the right
+    against the one on the left.
+
+    Cross checking is a process where you compare two depth maps.
+
+    To obtain a consolidated map, the process consists in checking that the corresponding
+    pixels in the left and right disparity images are consistent. This can be done by comparing
+    their absolute difference to a threshold value. For our case, it is recommended to start
+    with a threshold value of 8, while the best threshold value for your implementation can
+    be obtained by experimentation. If the absolute difference is larger than the threshold,
+    then replace the pixel value with zero. Otherwise the pixel value remains unchanged.
+    This process helps in removing the probable lack of consistency between the depth maps
+    due to occlusions, noise, or algorithmic limitation.
+
+    Abs requires: #include <cstdlib>
+
+    this->createEmpty(left.width, right.width);
+    threshold = 8;
+
+    // If the absolute difference is larger than the threshold,
+    // then replace the pixel value with zero. Otherwise the pixel value remains unchanged.
+
+    // Spacha: I assume that the "otherwise the pixel remains unchanged" means that we
+    // pick one from either left or right picture? We'll pick from the left image.
+
+    Pixel zeroPixel = Pixel(0, 0, 0, 0)
+
+    FOR y in left:
+        FOR x in left:
+            Pixel leftPixel = left.getPixel(x, y);
+            if (std::abs(leftPixel - right.getPixel(x, y)) > threshold):
+                this->putPixel(x, y, zeroPixel)
+            else:
+                this->putPixel(x, y, leftPixel)
+
+    */
     bool success;
     cout << "Performing cross-check... ";
 
@@ -362,6 +408,34 @@ bool Image::crossCheck(Image &left, Image &right)
  */
 bool Image::occlusionFill()
 {
+    /*
+    Occlusion filling is the process of eliminating the pixels that have been
+    assigned to zero by the previously calculated cross-checking. In the simplest
+    form it can be done by replacing each pixel with zero value with the nearest
+    non-zero pixel value. However, in this exercise it is recommended that you
+    experiment with other more complex postprocessing approaches that obtain the
+    pixel value in different forms.
+
+    Some ideas:
+        - take the pixel from left (or right if on the left edge)
+        - take the average of the surrounding pixels (interpolate)...
+
+    FOR x in this->image:
+        FOR y in this->image:
+            if !this->getPixel(x, y).isZero():  // not zero, next pixel
+                continue
+
+            // filling is needed
+            Pixel newPixel(0, 0, 0, 0);
+
+            // note: this can well be empty as well, need
+            // to specifically look for non-zero pixel!
+            if (x > 0)
+                this->putPixel(x, y, this->getPixel(x - 1, y));
+            else                         // on the left edge
+                this->putPixel(x, y, this->getPixel(x + 1, y));
+
+    */
     bool success;
     cout << "Performing occlusion fill... ";
 
@@ -434,6 +508,31 @@ void Image::printPixel(unsigned int x, unsigned int y)
 bool Image::validCoordinates(unsigned int x, unsigned int y)
 {
     return !(x > (width-1) || y > (height-1) || x < 0 || y < 0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Get information
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Calculates the average pixel value of the image.
+ * Assumes the image is in grayscale.
+ *
+ * @return    Average pixel value.
+ */
+unsigned char Image::grayAverage()
+{
+    unsigned __int64 avg = 0;
+
+    for (unsigned int y = 0; y < this->height; y++)
+    {
+        for (unsigned int x = 0; x < this->width; x++)
+        {
+            avg += this->getPixel(x, y).red; // only take the red channel into account
+        }
+    }
+
+    return (unsigned char)(avg / (this->width * this->height));
 }
 
 /**

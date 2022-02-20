@@ -6,7 +6,10 @@
 
 PerfTimer::PerfTimer()
 {
-    // ...
+    StartingTime.QuadPart        = 0;
+    EndingTime.QuadPart          = 0;
+    ElapsedMicroseconds.QuadPart = 0;
+    Frequency.QuadPart           = 0;
 }
 
 PerfTimer::~PerfTimer()
@@ -16,7 +19,7 @@ PerfTimer::~PerfTimer()
 
 /**
  * Start/reset performance counter.
- **/
+ */
 void PerfTimer::reset()
 {
     QueryPerformanceFrequency(&Frequency);
@@ -25,7 +28,7 @@ void PerfTimer::reset()
 
 /**
  * Get a snapshot of the delta time in microseconds. 
- **/
+ */
 long long int PerfTimer::getMicroseconds()
 {
     QueryPerformanceCounter(&EndingTime);
@@ -38,10 +41,10 @@ long long int PerfTimer::getMicroseconds()
 
 /**
  * A helper for printing the execution time since start.
- **/
+ */
 void PerfTimer::printTime()
 {
-    double us = this->getMicroseconds();
+    double us = (double)this->getMicroseconds();
 
     std::string unitsStr;
     double divisor;
