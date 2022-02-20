@@ -1,6 +1,6 @@
 #pragma once
 
-#define CL_USE_DEPRECATED_OPENCL_2_0_APIS // required for using old APIs
+// #define CL_USE_DEPRECATED_OPENCL_2_0_APIS // required for using old APIs
 
 #include <CL/cl.h>
 #include <iostream>

@@ -66,9 +66,9 @@ int main(int argc, char *argv[])
     std::string leftImgName;
     std::string rightImgName;
 
-    Image leftImg;              // left stereo image
-    Image rightImg;             // right stereo image
-    Image finalImg;             // final image after cross-checking
+    Image *leftImg = new Image();               // left stereo image
+    Image *rightImg = new Image();              // right stereo image
+    Image finalImg;                             // final image after cross-checking
 
     const int downscaleFactor = 4;
 
@@ -94,8 +94,8 @@ int main(int argc, char *argv[])
     // initialize OpenCL if necessary
     MiniOCL ocl(kernelFileName);
     ocl.initialize(TARGET_DEVICE_TYPE);
-    leftImg.setOpenCL(&ocl);
-    rightImg.setOpenCL(&ocl);
+    leftImg->setOpenCL(&ocl);
+    rightImg->setOpenCL(&ocl);
 
     ocl.displayDeviceInfo();
 #endif /* USE_OCL */
@@ -103,35 +103,35 @@ int main(int argc, char *argv[])
     // 1. Load both images from disk
 
     ptimer.reset();
-    success = leftImg.load(leftImgName);
+    success = leftImg->load(leftImgName);
     CHECK_ERROR(success, "Error loading the left image from disk.")
-    success = rightImg.load(rightImgName);
+    success = rightImg->load(rightImgName);
     CHECK_ERROR(success, "Error loading the right image from disk.")
     ptimer.printTime();
 
     cout << "Left image '" << leftImgName << "', size "
-         << leftImg.width << "x" << leftImg.height << "." << endl;
+         << leftImg->width << "x" << leftImg->height << "." << endl;
     cout << "Right image '" << rightImgName << "', size "
-         << rightImg.width << "x" << rightImg.height << "." << endl;
+         << rightImg->width << "x" << rightImg->height << "." << endl;
 
     // 2. Downscale (resize) the both images
 
-    const int newWidth = leftImg.width / downscaleFactor;
-    const int newHeight = leftImg.height / downscaleFactor;
+    size_t newWidth = leftImg->width / (size_t)downscaleFactor;
+    size_t newHeight = leftImg->height / (size_t)downscaleFactor;
 
     ptimer.reset();
-    success = leftImg.resize(newWidth, newHeight);
+    success = leftImg->resize(newWidth, newHeight);
     CHECK_ERROR(success, "Error downscaling the left image.")
-    success = rightImg.resize(newWidth, newHeight);
+    success = rightImg->resize(newWidth, newHeight);
     CHECK_ERROR(success, "Error downscaling the right image.")
     ptimer.printTime();
 
     // 3. Convert both images to grayscale
 
     ptimer.reset();
-    success = leftImg.convertToGrayscale();
+    success = leftImg->convertToGrayscale();
     CHECK_ERROR(success, "Error transforming the left image to grayscale.")
-    success = rightImg.convertToGrayscale();
+    success = rightImg->convertToGrayscale();
     CHECK_ERROR(success, "Error transforming the right image to grayscale.")
     ptimer.printTime();
 
@@ -142,9 +142,9 @@ int main(int argc, char *argv[])
 #endif /* USE_OCL */
 
     ptimer.reset();
-    success = leftImg.save("img/1-gray-l.png");
+    success = leftImg->save("img/1-gray-l.png");
     CHECK_ERROR(success, "Error saving the left image to disk.")
-    success = rightImg.save("img/1-gray-r.png");
+    success = rightImg->save("img/1-gray-r.png");
     CHECK_ERROR(success, "Error saving the right image to disk.")
     ptimer.printTime();
 
@@ -154,15 +154,15 @@ int main(int argc, char *argv[])
     Image *rightDispImg = new Image();     // contains the right-to-left disparity map
 
     ptimer.reset();
-    success = leftImg.calcZNCC(rightImg, leftDispImg);
+    success = leftImg->calcZNCC(*rightImg, leftDispImg);
     CHECK_ERROR(success, "Error calculating ZNCC for the left image.")
-    success = rightImg.calcZNCC(leftImg, rightDispImg);
+    success = rightImg->calcZNCC(*leftImg, rightDispImg);
     CHECK_ERROR(success, "Error calculating ZNCC for the right image.")
     ptimer.printTime();
 
     // these have become unnecessary at this point
-    delete &leftImg;
-    delete &rightImg;
+    delete leftImg; // works only if we used: Image leftImage = new Image();
+    delete rightImg;
 
     // TODO: If we use OCL, put benchmark here.
 
@@ -204,11 +204,6 @@ int main(int argc, char *argv[])
     success = finalImg.save("img/4-occlusion-filled.png");
     CHECK_ERROR(success, "Error saving image to disk.")
     ptimer.printTime();
-
-    // cleanup
-    delete &finalImg;
-    delete &ptimer;
-    delete &ocl;
 
     return EXIT_SUCCESS;
 }
