@@ -55,14 +55,17 @@ void Image::createEmpty(size_t width, size_t height)
  * Replaces the current image with given image @newImage.
  * The image sizes must match exactly.
  * 
- * @param newImage Image that will replace the current image. Must be the same size.
+ * @param newImage Image that will replace the current image.
  */
-void Image::replaceImage(std::vector<unsigned char> &newImage)
+void Image::replace(Image &newImage)
 {
-    if (newImage.size() != this->image.size())
-        throw;
+    if (newImage.width != this->width || newImage.height != this->height)
+    {
+        // new image is different size -> make a new image
+        this->createEmpty(newImage.width, newImage.height);
+    }
 
-    this->image = std::move(newImage);
+    this->image = std::move(newImage.image);
 }
 
 /**
@@ -282,7 +285,7 @@ bool Image::filter(const Filter &filter)
 
     cout << "Check if can divide alpha too, then REMOVE THIS COMMENT" << endl;
     // update the image
-    this->replaceImage(tempImage.image);
+    this->replace(tempImage);
 
 #endif
     cout << "Done." << endl;
@@ -290,28 +293,65 @@ bool Image::filter(const Filter &filter)
 }
 
 /**
- * Resizes the image to desired dimensions using
- * a simple filter + downsample technique.
+ * Dynamically creates an averaging filter and applies it to the image.
  * 
- * @param width New image width.
- * @param width New image height.
- * @return      True on success, false on fail.
+ * @param size Size of the mask.
+ * @return     True on success, false on fail.
  */
-bool Image::resize(size_t width, size_t height)
+bool Image::filterMean(size_t size)
 {
-    bool success;
+    // fill the mask with ones
+    float mask[size * size] = {0};
+    for (unsigned int i = 0; i < size * size; i++) { mask[i] = 1.0f; }
+
+    const Filter filter((const size_t)size, (const float)(size * size), mask);
+
+    return this->filter(filter);
+}
+
+/**
+ * Scales the image down by given integer factor.
+ *
+ * @todo Different factor for x and y would be easy.
+ *
+ * @param factor Scaling factor.
+ * @return       True on success, false on fail.
+ */
+bool Image::downScale(unsigned int factor)
+{
     cout << "Resizing image... ";
 
-    // ...
-    success = true;
+    // Current implementation is quite rough: just blur using
+    // an averaging filter and then drop some pixels.
 
-    this->filter(g_gaussianFilter);
-    //this->width = width;
-    //this->height = height;
+    // Since we cannot use even-sized kernels, use the
+    // closest odd-numbered kernel size towards zero.
+    // For example, if factor = 4 or 5 => maskSize = 5.
+    size_t maskSize = (factor % 2 == 0) ? factor + 1 : factor;
+
+    // filtering the image first gives a better downscaling quality
+    this->filterMean(maskSize);
+
+    Image tempImage;
+    tempImage.createEmpty(this->width / factor, this->height / factor);
+
+    for (unsigned int y = 0; y < this->height; y++)
+    {
+        if (y % factor == 0) continue; // skip every factor'th row
+
+        for (unsigned int x = 0; x < this->width; x++)
+        {
+            if (x % factor == 0) continue; // skip every factor'th column
+
+            // copy the pixel
+            tempImage.putPixel(x / factor, y / factor, this->getPixel(x, y));
+        }
+    }
+
+    this->replace(tempImage);
 
     cout << "Done." << endl;
-    return success;
-
+    return true;
 }
 
 /* NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE */
@@ -320,7 +360,7 @@ class ZNCC
 public:
     unsigned char leftAvg;      // corresponds to bar(I_L) in the material
     unsigned char rightAvg;     // corresponds to bar(I_R) in the material
-    unsigned int windowSize;    // corresponds to B in the material
+    unsigned int windowSize;    // corresponds to B or WIN_SIZE in the material
     unsigned int  dMax;         // corresponds to d or MAX_DISP in the material
 
     ZNCC(unsigned char leftAvg, unsigned char rightAvg, unsigned int windowSize, unsigned int dMax)

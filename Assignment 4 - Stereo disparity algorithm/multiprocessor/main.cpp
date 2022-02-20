@@ -116,13 +116,10 @@ int main(int argc, char *argv[])
 
     // 2. Downscale (resize) the both images
 
-    size_t newWidth = leftImg->width / (size_t)downscaleFactor;
-    size_t newHeight = leftImg->height / (size_t)downscaleFactor;
-
     ptimer.reset();
-    success = leftImg->resize(newWidth, newHeight);
+    success = leftImg->downScale(downscaleFactor);
     CHECK_ERROR(success, "Error downscaling the left image.")
-    success = rightImg->resize(newWidth, newHeight);
+    success = rightImg->downScale(downscaleFactor);
     CHECK_ERROR(success, "Error downscaling the right image.")
     ptimer.printTime();
 

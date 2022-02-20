@@ -61,14 +61,17 @@ public:
 
     // image creation etc.
     void createEmpty(size_t width, size_t height);
-    void replaceImage(std::vector<unsigned char> &newImage);
+    //void replaceImage(std::vector<unsigned char> &newImage);
+    void replace(Image &newImage);
     bool load(const std::string &filename);
     bool save(const std::string &filename);
 
     // image manipulation
     bool convertToGrayscale();
     bool filter(const Filter &filter);
-    bool resize(size_t width, size_t height);
+    bool filterMean(size_t size);
+    //bool resize(size_t width, size_t height);
+    bool downScale(unsigned int factor);
     bool calcZNCC(Image &otherImg, Image *disparityMap);
     bool crossCheck(Image &left, Image &right);
     bool occlusionFill();
