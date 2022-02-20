@@ -48,7 +48,6 @@ void Image::createEmpty(size_t width, size_t height)
 
     this->image.clear();
     this->image.resize(this->sizeBytes(), (unsigned char)0);
-    this->image.resize(this->sizeBytes(), (unsigned char)0);
 }
 
 /**

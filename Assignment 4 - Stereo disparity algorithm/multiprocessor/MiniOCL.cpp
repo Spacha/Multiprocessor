@@ -222,14 +222,13 @@ bool MiniOCL::setInputImageBuffer(cl_uint argIndex, void *data, size_t width, si
     // Pixel format: RGBA, each pixel channel is unsigned 8-bit integer
     static const cl_image_format format = { CL_RGBA, CL_UNORM_INT8 };
 
-    static const cl_image_desc description = {
+    const cl_image_desc description = {
         CL_MEM_OBJECT_IMAGE2D, width, height, 0, 0, 0, 0, 0, 0, NULL
     };
 
     cl_mem_flags flags = CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR;
     // cl_mem buffer = clCreateImage(context, flags, &format, &description, data, &err);
     cl_mem buffer = clCreateImage(context, flags, &format, &description, data, &err);
-
     // set the arguments to the kernel
     err |= clSetKernelArg(kernel, argIndex, sizeof(cl_mem), &buffer);
     
