@@ -248,7 +248,8 @@ bool Image::filter(const Filter &filter)
         for (unsigned int cx = 0; cx < width; cx++)
         {
             unsigned int weight = 0;
-            Pixel newClr = Pixel(0.0f, 0.0f, 0.0f, 255.0f);
+            // we need more space per pixel since we first accumulate and then divide
+            unsigned long int newRed = 0, newGreen = 0, newBlue = 0, newAlpha = 0;
 
             // iterate over each element in the mask
             for (int y = cy - d; y <= (int)(cy + d); y++)
@@ -256,20 +257,26 @@ bool Image::filter(const Filter &filter)
                 for (int x = cx - d; x <= (int)(cx + d); x++)
                 {
                     // get pixel if within image
-                    Pixel p(0, 0, 0, 0);
-                    if (validCoordinates(x, y))
-                        p = this->getPixel(x, y);
+                    Pixel p = validCoordinates(x, y)
+                        ? this->getPixel(x, y)
+                        : Pixel(0, 0, 0, 0);
 
-                    newClr.red   += filter.mask[weight] * (float)p.red;
-                    newClr.green += filter.mask[weight] * (float)p.green;
-                    newClr.blue  += filter.mask[weight] * (float)p.blue;
+                    newRed   += filter.mask[weight] * p.red;
+                    newGreen += filter.mask[weight] * p.green;
+                    newBlue  += filter.mask[weight] * p.blue;
+                    newAlpha  += filter.mask[weight] * p.alpha;
                     weight++;
                 }
             }
 
+            Pixel newClr(
+                (unsigned char)(newRed / filter.divisor),
+                (unsigned char)(newGreen / filter.divisor),
+                (unsigned char)(newBlue / filter.divisor),
+                (unsigned char)(newAlpha / filter.divisor));
 
             // replace the pixel in the center of the mask
-            tempImage.putPixel(cx, cy, p / filter.divisor);
+            tempImage.putPixel(cx, cy, newClr);
         }
     }
 
@@ -298,35 +305,60 @@ bool Image::resize(size_t width, size_t height)
     // ...
     success = true;
 
-    // this->filter(g_filters->meanFilter);
-    // this->width = width;
-    // this->height = height;
+    this->filter(g_gaussianFilter);
+    //this->width = width;
+    //this->height = height;
 
     cout << "Done." << endl;
     return success;
 
 }
 
+/* NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE NOT HERE */
+class ZNCC
+{
+public:
+    unsigned char leftAvg;      // corresponds to bar(I_L) in the material
+    unsigned char rightAvg;     // corresponds to bar(I_R) in the material
+    unsigned int windowSize;    // corresponds to B in the material
+    unsigned int  dMax;         // corresponds to d or MAX_DISP in the material
+
+    ZNCC(unsigned char leftAvg, unsigned char rightAvg, unsigned int windowSize, unsigned int dMax)
+    : leftAvg(leftAvg), rightAvg(rightAvg), windowSize(windowSize), dMax(dMax) {}
+
+    unsigned char calculate(unsigned int x, unsigned int y, unsigned int d)
+    {
+        (void)x;
+        (void)y;
+        (void)d;
+        return 0;
+    }
+};
+
 /**
  * Calculates the disparity map of the image compared to
  * another image. The disparity map replaces the current image.
  * 
- * @param otherImage   The image to be compared against.
+ * @param otherImg     The image to be compared against.
  * @param disparityMap Pointer to a location to store the disparity map.
  * @return             True on success, false on fail.
  */
 bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
 {
+    /*
+    Search parameters:
+        - left image (this), right image (otherImg)
+        - blockSize (B)
+        - dMax (d)
+    */
     bool success;
     cout << "Calculating ZNCC... ";
 
     disparityMap->createEmpty(otherImg.width, otherImg.height);
 
-    unsigned char leftAvg = this->grayAverage();
-    unsigned char rightAvg = otherImg.grayAverage();
-
-    //printf("Left average: %u\n", leftAvg);
-    //printf("Right average: %u\n", rightAvg);
+    // NOTE: The avg should apparently be calculated of each patch
+    // unsigned char leftAvg = this->grayAverage();        // = bar(I_L)
+    // unsigned char rightAvg = otherImg.grayAverage();    // = bar(I_R)
 
     // Do the magic...
     success = true;
@@ -489,7 +521,7 @@ Pixel Image::getPixel(unsigned int x, unsigned int y)
     // RGBA
     // unsigned int i = 4*(y*width + x);
     const __int64 i = 4 * (y * width + x);
-    return { image[i], image[i+1], image[i+2], image[i+3] };
+    return Pixel(image[i], image[i + 1], image[i + 2], image[i + 3]);
 }
 
 /**
