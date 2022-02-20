@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Application.hpp"
+#include "Filters.hpp"
 #include "MiniOCL.hpp"
 #include "lodepng.h"
 
@@ -31,13 +32,11 @@ struct Pixel
 };
 typedef struct Pixel Pixel;
 
-/* Same struct but as float (0.0f - 1.0f) */
-
 /**
  * This is my wrapper for lodepng.h that simplifies the handling of PNGs a lot.
  * The object contains image metadata and offers
  * functions for manipulating the image.
- **/
+ */
 class Image
 {
 public:
@@ -61,7 +60,7 @@ public:
     bool convertToGrayscale();
     bool filter(const Filter &filter);
     bool resize(size_t width, size_t height);
-    Image *calcZNCC(Image &otherImg);
+    bool calcZNCC(Image &otherImg, Image *disparityMap);
     bool crossCheck(Image &left, Image &right);
     bool occlusionFill();
 

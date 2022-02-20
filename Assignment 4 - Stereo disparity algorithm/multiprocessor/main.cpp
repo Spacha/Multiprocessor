@@ -1,6 +1,7 @@
 #include "Application.hpp"
 #include "PerfTimer.hpp"
 #include "MiniOCL.hpp"
+#include "Filters.hpp"
 #include "Image.hpp"
 
 using std::cout;
@@ -30,45 +31,6 @@ using std::endl;
 
 const char *kernelFileName = "kernels.cl";
 // const std::string imgName  = "img/simple.png";
-
-///////////////////////////////////////////////////////////////////////////////
-// FILTERS
-///////////////////////////////////////////////////////////////////////////////
-
-const size_t maskSize = 5;
-
-// Mean filter (5x5)
-const float meanFilterMask[maskSize*maskSize] = {
-     1.0f, 1.0f, 1.0f, 1.0f,  1.0f,
-     1.0f, 1.0f, 1.0f, 1.0f,  1.0f,
-     1.0f, 1.0f, 1.0f, 1.0f,  1.0f,
-     1.0f, 1.0f, 1.0f, 1.0f,  1.0f,
-     1.0f, 1.0f, 1.0f, 1.0f,  1.0f
-};
-const Filter meanFilter(maskSize, 25.0f, meanFilterMask);
-
-// Gaussian filter (5x5)
-const float gaussianFilterMask[maskSize*maskSize] = {
-     1.0f,  4.0f,  7.0f,  4.0f,  1.0f,
-     4.0f, 16.0f, 26.0f, 16.0f,  4.0f,
-     7.0f, 26.0f, 41.0f, 26.0f,  7.0f,
-     4.0f, 16.0f, 26.0f, 16.0f,  4.0f,
-     1.0f,  4.0f,  7.0f,  4.0f,  1.0f
-};
-const Filter gaussianFilter(maskSize, 273.0f, gaussianFilterMask);
-
-// Emboss filter (5x5)
-const float embossFilterMask[maskSize*maskSize] = {
-     -1.0f,  0.0f, 0.0f, 0.0f, 0.0f,
-      0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-      0.0f,  0.0f, 0.0f, 0.0f, 0.0f,
-      0.0f,  0.0f, 0.0f, 1.0f, 0.0f,
-      0.0f,  0.0f, 0.0f, 0.0f, 1.0f
-};
-const Filter embossFilter(maskSize, 1.0f, embossFilterMask);
-
-const Filter filters[] = { meanFilter, gaussianFilter, embossFilter };
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // HELPER FUNCTIONS
@@ -188,17 +150,19 @@ int main(int argc, char *argv[])
 
     // 4. Calculate stereo disparity (ZNCC) for both images
 
-    Image *leftDispImg;      // contains the left-to-right disparity map
-    Image *rightDispImg;     // contains the right-to-left disparity map
+    Image *leftDispImg = new Image();      // contains the left-to-right disparity map
+    Image *rightDispImg = new Image();     // contains the right-to-left disparity map
 
     ptimer.reset();
-    leftDispImg = leftImg.calcZNCC(rightImg); // TODO: error checking for these?
-    rightDispImg = rightImg.calcZNCC(leftImg);
+    success = leftImg.calcZNCC(rightImg, leftDispImg);
+    CHECK_ERROR(success, "Error calculating ZNCC for the left image.")
+    success = rightImg.calcZNCC(leftImg, rightDispImg);
+    CHECK_ERROR(success, "Error calculating ZNCC for the right image.")
     ptimer.printTime();
 
     // these have become unnecessary at this point
-    delete leftImg;
-    delete rightImg;
+    delete &leftImg;
+    delete &rightImg;
 
     // TODO: If we use OCL, put benchmark here.
 
@@ -212,7 +176,7 @@ int main(int argc, char *argv[])
     // 5. Cross checking
 
     ptimer.reset();
-    finalImg.crossCheck(leftDispImg, rightDispImg);
+    finalImg.crossCheck(*leftDispImg, *rightDispImg);
     CHECK_ERROR(success, "Error in cross checking.")
     ptimer.printTime();
 
@@ -220,11 +184,7 @@ int main(int argc, char *argv[])
     delete leftDispImg;
     delete rightDispImg;
 
-#ifdef USE_OCL
-    // print the actual kernel execution time
-    kernelTime = ocl.getExecutionTime();
-    printf("\t=> Kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
-#endif /* USE_OCL */
+    // TODO: If we use OCL, put benchmark here.
 
     ptimer.reset();
     success = finalImg.save("img/3-cross-checked.png");
@@ -238,11 +198,7 @@ int main(int argc, char *argv[])
     CHECK_ERROR(success, "Error in occlusion filling.")
     ptimer.printTime();
 
-#ifdef USE_OCL
-    // print the actual kernel execution time
-    kernelTime = ocl.getExecutionTime();
-    printf("\t=> Right image kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
-#endif /* USE_OCL */
+    // TODO: If we use OCL, put benchmark here.
 
     ptimer.reset();
     success = finalImg.save("img/4-occlusion-filled.png");
@@ -250,8 +206,9 @@ int main(int argc, char *argv[])
     ptimer.printTime();
 
     // cleanup
-    delete finalImg;
-    ocl->cleanup();
+    delete &finalImg;
+    delete &ptimer;
+    delete &ocl;
 
     return EXIT_SUCCESS;
 }

@@ -20,7 +20,17 @@ MiniOCL::MiniOCL(const char* kernelFileName)
  */
 MiniOCL::~MiniOCL()
 {
-    // destroy the object, release memory...
+    // release buffers
+    //clReleaseMemObject((cl_mem *)outImg);
+
+    clReleaseEvent(kernelEvent);
+
+    // release OpenCL resources
+    clReleaseKernel(kernel);
+    clReleaseProgram(program);
+    clReleaseCommandQueue(queue);
+    clReleaseContext(context);
+ 
 }
 
 /**

@@ -23,7 +23,7 @@ typedef struct image_buf_s image_buf_t;
 
 /**
  * A simple wrapper class for accessing OpenCL.
- **/
+ */
 class MiniOCL
 {
 	const char* kernelFileName;

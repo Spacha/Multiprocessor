@@ -293,6 +293,7 @@ bool Image::filter(const Filter &filter)
 bool Image::resize(size_t width, size_t height)
 {
     bool success;
+    cout << "Resizing image... ";
 
     // ...
     success = true;
@@ -301,6 +302,7 @@ bool Image::resize(size_t width, size_t height)
     // this->width = width;
     // this->height = height;
 
+    cout << "Done." << endl;
     return success;
 
 }
@@ -308,15 +310,22 @@ bool Image::resize(size_t width, size_t height)
  * Calculates the disparity map of the image compared to
  * another image. The disparity map replaces the current image.
  * 
- * @param otherImage The image to be compared against.
- * @return           A pointer to an image containing the disparity map.
+ * @param otherImage   The image to be compared against.
+ * @param disparityMap Pointer to a location to store the disparity map.
+ * @return             True on success, false on fail.
  */
-Image &Image::calcZNCC(Image &otherImg)
+bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
 {
-    Image disparityMap;
+    bool success;
+    cout << "Calculating ZNCC... ";
+
     disparityMap->createEmpty(otherImg.width, otherImg.height);
 
-    return &disparityMap; // return a pointer
+    // Do the magic...
+    success = true;
+
+    cout << "Done." << endl;
+    return success;
 
 }
 
@@ -331,25 +340,35 @@ Image &Image::calcZNCC(Image &otherImg)
 bool Image::crossCheck(Image &left, Image &right)
 {
     bool success;
+    cout << "Performing cross-check... ";
 
     // the disparity maps must be exactly the same size
-    if (left->width != right->width || left->height != right->height)
+    if (left.width != right.width || left.height != right.height)
         return false;
 
-    this->createEmpty(left->width, left->height);
+    this->createEmpty(left.width, left.height);
 
     // Do some magic, will ya?
     success = true;
 
+    cout << "Done." << endl;
     return success;
 }
+
+/**
+ * Performs an occlusion filling to the image. The image is overwritten.
+ * 
+ * @return       True on success, false on fail.
+ */
 bool Image::occlusionFill()
 {
     bool success;
+    cout << "Performing occlusion fill... ";
 
     // ...
     success = true;
 
+    cout << "Done." << endl;
     return success;
 }
 
@@ -360,7 +379,7 @@ bool Image::occlusionFill()
 
 /**
  * Puts given RGBA (4 channel) pixel to position (x,y).
- **/
+ */
 void Image::putPixel(unsigned int x, unsigned int y, Pixel pixel)
 {
     if (!validCoordinates(x, y))
@@ -387,7 +406,7 @@ void Image::putPixel(unsigned int x, unsigned int y, unsigned char grey)
 /**
  * Returns a pixel struct containing the color values
  * of each pixel in position (x,y).
- **/
+ */
 Pixel Image::getPixel(unsigned int x, unsigned int y)
 {
     if (!validCoordinates(x, y))
@@ -401,7 +420,7 @@ Pixel Image::getPixel(unsigned int x, unsigned int y)
 
 /**
  * Print hex color value of pixel in position (x,y).
- **/
+ */
 void Image::printPixel(unsigned int x, unsigned int y)
 {
     Pixel pixel = getPixel(x, y);
@@ -411,7 +430,7 @@ void Image::printPixel(unsigned int x, unsigned int y)
 /**
  * Returns true if given coordinates point to
  * a pixel coordinate, otherwise false.
- **/
+ */
 bool Image::validCoordinates(unsigned int x, unsigned int y)
 {
     return !(x > (width-1) || y > (height-1) || x < 0 || y < 0);
@@ -419,7 +438,7 @@ bool Image::validCoordinates(unsigned int x, unsigned int y)
 
 /**
  * Returns the size of the image in bytes.
- **/
+ */
 size_t Image::sizeBytes()
 {
     // TODO: Can we guarantee always having 4 channels?
