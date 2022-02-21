@@ -401,8 +401,12 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
     // NOTE: The avg should apparently be calculated of each patch
     // unsigned char leftAvg = this->grayAverage();        // = bar(I_L)
     // unsigned char rightAvg = otherImg.grayAverage();    // = bar(I_R)
-    const char windowSize = 20;
-    const char maxSearchDist = 55;
+    const char windowSize = 5;
+    const char maxSearchDist = 10; // 55
+
+    // DEV
+    float progress = 0.0f;
+    float progressPerRound = 1.0f / this->height;
 
     // TODO: should d be of opposite sign when comparing right-to-left?
     for (int y = 0; y < this->height; y++) // 735
@@ -436,7 +440,6 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
 
                         leftWindowAvg  += this->getGrayPixel(x + wx, y + wy);
                         rightWindowAvg += otherImg.getGrayPixel(x + wx, y + wy);
-                        cout << wN << " ";
                         wN++;
                     }
                 }
@@ -458,16 +461,16 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
                     {
                         // work on search distance d for pixel (x,y), local window pixel (wx,wy)
                         // = 8.1 billion iterations
-                        if ((x + wx) < 0 || x >= (width - wx) || (y + wy) < 0 || y >= (height - wy))  // prevent reading outside the image
+                        if ((x + wx - d) < 0 || x > (width - wx) || (y + wy) < 0 || y > (height - wy))  // prevent reading outside the image
                             continue;
 
                         // difference of (left/right) image pixel from the average
                         char leftDiff  = this->getGrayPixel(x + wx, y + wy) - leftWindowAvg;
                         char rightDiff = otherImg.getGrayPixel(x + wx - d, y + wy) - rightWindowAvg;
 
-                        upperSum += leftDiff * rightDiff;
-                        lowerLeftSum += leftDiff*leftDiff;      // leftDiff ^ 2
-                        lowerRightSum += rightDiff*rightDiff;   // rightDiff ^ 2
+                        upperSum      += leftDiff * rightDiff;
+                        lowerLeftSum  += leftDiff * leftDiff;     // leftDiff ^ 2
+                        lowerRightSum += rightDiff * rightDiff;   // rightDiff ^ 2
                     }
                 }
 
@@ -485,6 +488,8 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
             // put the best disparity value to the disparity map
             disparityMap->putPixel(x, y, bestDisp);
         }
+        progress += progressPerRound;
+        cout << "Progress: " << (unsigned int)(100 * progress) << " %" << endl;
     }
     // total of 2*8.1 billion = 16.2 billion iterations
     // assuming each iteration takes 1000 cycles => 16 000 billion cycles

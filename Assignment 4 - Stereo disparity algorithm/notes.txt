@@ -94,3 +94,14 @@ Basic idea (to my understanding):
             d_optimal = d
 
         d += dx                             // move patch to the left
+
+
+# Disparity parameters
+
+By measuring the closest point (the upper right corner of the tray),
+I got a distance (disparity) of:
+    213 => maxSearchDist = 215
+    Downscaled: maxSearchDist = 55
+
+First i'll try window size of 20:
+    windowSize = 20
