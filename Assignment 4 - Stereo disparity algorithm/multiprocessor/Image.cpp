@@ -308,7 +308,7 @@ bool Image::filterMean(const size_t size)
     if (mask != NULL)
     {
         // populate the mask with ones
-        for (int i = 0; i < (size * size); i++) { mask[i] = 1.0f; }
+        for (unsigned int i = 0; i < (size * size); i++) { mask[i] = 1.0f; }
 
         const Filter filter((const size_t)size, (const float)(size * size), mask);
         success = this->filter(filter);
@@ -401,51 +401,64 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
     // NOTE: The avg should apparently be calculated of each patch
     // unsigned char leftAvg = this->grayAverage();        // = bar(I_L)
     // unsigned char rightAvg = otherImg.grayAverage();    // = bar(I_R)
-    const char windowSize = 5;
-    const char maxSearchDist = 10; // 55
+    const char windowSize = 11;
+    const char maxSearchDist = 30; // 55
+
+    if (windowSize % 2 == 0)
+    {
+        cout << "Window size must be odd." << endl;
+        return false;
+    }
+    
+    // precalculate some...
+    const char halfWindow = (windowSize - 1) / 2;
+    const unsigned int pixelsPerWindow = windowSize * windowSize;
 
     // DEV
     float progress = 0.0f;
     float progressPerRound = 1.0f / this->height;
 
     // TODO: should d be of opposite sign when comparing right-to-left?
-    for (int y = 0; y < this->height; y++) // 735
+    for (unsigned int y = halfWindow; y < (this->height - halfWindow); y++) // 735
     {
         // = 735 iterations
-        for (int x = 0; x < this->width; x++) // 504
+        for (unsigned int x = halfWindow; x < (this->width - halfWindow); x++) // 504
         {
             // work on pixel (x,y)
             // = 370 thousands iterations
-            unsigned int bestDisp = 0;
+            unsigned char bestDisp = 0;
+            char maxD = std::min((int)maxSearchDist, (int)(x - halfWindow));     // stops at the left edge
 
-            for (int d = 0; d < maxSearchDist; d++) // 55
+            for (int d = 0; d <= maxD; d++) // 55
             {
                 // work on search distance d for pixel (x,y)
                 // = 20 million iterations
 
                 unsigned int leftWindowAvg = 0;
                 unsigned int rightWindowAvg = 0;
-                unsigned int wN = 0;  // actual number of pixels in window; used in calculating the average
+                // unsigned int wN = 0;  // actual number of pixels in window; used in calculating the average
                 float maxCorrelation = 0.0f;
 
-                for (int wy = -(windowSize - 1)/2; wy <= (windowSize - 1)/2; wy++) // 20
+                for (int wy = -halfWindow; wy <= halfWindow; wy++) // 20
                 {
                     // = 407 million iterations
-                    for (int wx = -(windowSize - 1)/2; wx <= (windowSize - 1)/2; wx++) // 20
+                    for (int wx = -halfWindow; wx <= halfWindow; wx++) // 20
                     {
                         // work on search distance d for pixel (x,y), local window pixel (wx,wy)
                         // = 8.1 billion iterations
-                        if ((x + wx) < 0 || x > (width - wx) || (y + wy) < 0 || y > (height - wy))  // prevent reading outside the image
-                            continue;
-
                         leftWindowAvg  += this->getGrayPixel(x + wx, y + wy);
-                        rightWindowAvg += otherImg.getGrayPixel(x + wx, y + wy);
-                        wN++;
+                        rightWindowAvg += otherImg.getGrayPixel(x + wx - d, y + wy);
+                        //cout << "(" << (x+wx) << "," << (y+wy) << "): ";
+                        //cout << (unsigned int)this->getGrayPixel(x + wx, y + wy) << " -> " << leftWindowAvg << " ";
                     }
                 }
 
-                leftWindowAvg /= wN;
-                rightWindowAvg /= wN;
+                leftWindowAvg /= pixelsPerWindow;
+                rightWindowAvg /= pixelsPerWindow;
+
+                //cout << "(" << x << "," << y << "): ";
+                //cout << "leftAVG: " << leftWindowAvg;
+                //cout << ", rightAVG: " << rightWindowAvg << endl;
 
                 /* Calculate ZNCC */
 
@@ -454,15 +467,13 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
                 unsigned int lowerRightSum = 0;
 
                 /* Calculate ZNCC(x, y, d) */
-                for (int wy = -(windowSize - 1)/2; wy <= (windowSize - 1)/2; wy++) // 20
+                for (int wy = -halfWindow; wy <= halfWindow; wy++) // 20
                 {
                     // = 407 million iterations
-                    for (int wx = -(windowSize - 1)/2; wx <= (windowSize - 1)/2; wx++) // 20
+                    for (int wx = -halfWindow; wx <= halfWindow; wx++) // 20
                     {
                         // work on search distance d for pixel (x,y), local window pixel (wx,wy)
                         // = 8.1 billion iterations
-                        if ((x + wx - d) < 0 || x > (width - wx) || (y + wy) < 0 || y > (height - wy))  // prevent reading outside the image
-                            continue;
 
                         // difference of (left/right) image pixel from the average
                         char leftDiff  = this->getGrayPixel(x + wx, y + wy) - leftWindowAvg;
@@ -474,12 +485,18 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
                     }
                 }
 
+                //cout << "upperSum: " << upperSum;
+                //cout << ", lowerLeftSum: " << lowerLeftSum << ", lowerRightSum: " << lowerRightSum << endl;
+
                 // Finally calculate the ZNCC value
-                float correlation = (float)(upperSum / sqrt(lowerLeftSum) * sqrt(lowerRightSum));
+                float correlation = (float)(upperSum / (sqrt(lowerLeftSum) * sqrt(lowerRightSum)));
+
+                //cout << "\tZNCC: " << correlation << endl;
 
                 // update disparity value for pixel (x,y)
                 if (correlation > maxCorrelation)
                 {
+                    //cout << "New max, d = " << d << endl;
                     maxCorrelation = correlation;
                     bestDisp = d;
                 }
@@ -560,6 +577,25 @@ bool Image::crossCheck(Image &left, Image &right)
         return false;
 
     this->createEmpty(left.width, left.height);
+
+    unsigned char threshold = 8;
+
+    for (unsigned int y = 0; y < this->height; y++)
+    {
+        for (unsigned int x = 0; x < this->width; x++)
+        {
+            unsigned char leftPixel = left.getGrayPixel(x, y);
+
+            if (std::abs(leftPixel - right.getGrayPixel(x, y)) > threshold)
+            {
+                this->putPixel(x, y, (unsigned char)0);
+            }
+            else
+            {
+                this->putPixel(x, y, leftPixel);
+            }
+        }
+    }
 
     // Do some magic, will ya?
     success = true;
@@ -664,7 +700,7 @@ Pixel Image::getPixel(unsigned int x, unsigned int y)
  */
 unsigned char Image::getGrayPixel(unsigned int x, unsigned int y)
 {
-    return image[y * width + x];
+    return image[4 * (y * width + x)];
 }
 
 /**

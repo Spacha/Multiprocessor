@@ -115,7 +115,6 @@ int main(int argc, char *argv[])
          << rightImg->width << "x" << rightImg->height << "." << endl;
 
     // 2. Downscale (resize) the both images
-#if 0
     ptimer.reset();
     success = leftImg->downScale(downscaleFactor);
     CHECK_ERROR(success, "Error downscaling the left image.")
@@ -124,7 +123,6 @@ int main(int argc, char *argv[])
     ptimer.printTime();
 
     // 3. Convert both images to grayscale
-#endif
     ptimer.reset();
     success = leftImg->convertToGrayscale();
     CHECK_ERROR(success, "Error transforming the left image to grayscale.")
@@ -153,8 +151,8 @@ int main(int argc, char *argv[])
     ptimer.reset();
     success = leftImg->calcZNCC(*rightImg, leftDispImg);
     CHECK_ERROR(success, "Error calculating ZNCC for the left image.")
-    //success = rightImg->calcZNCC(*leftImg, rightDispImg);
-    //CHECK_ERROR(success, "Error calculating ZNCC for the right image.")
+    success = rightImg->calcZNCC(*leftImg, rightDispImg);
+    CHECK_ERROR(success, "Error calculating ZNCC for the right image.")
     ptimer.printTime();
 
     // these have become unnecessary at this point
@@ -166,10 +164,11 @@ int main(int argc, char *argv[])
     ptimer.reset();
     success = leftDispImg->save("img/2-disparity-l.png");
     CHECK_ERROR(success, "Error saving the left image to disk.")
-    return EXIT_SUCCESS;  // TODO: Testing only!!
     success = rightDispImg->save("img/2-disparity-r.png");
     CHECK_ERROR(success, "Error saving the right image to disk.")
     ptimer.printTime();
+
+    return 0;
 
     // 5. Cross checking
 
@@ -188,6 +187,8 @@ int main(int argc, char *argv[])
     success = finalImg.save("img/3-cross-checked.png");
     CHECK_ERROR(success, "Error saving image to disk.")
     ptimer.printTime();
+
+    return EXIT_SUCCESS;  // TODO: Testing only!!
 
     // 6. Occlusion filling
 
