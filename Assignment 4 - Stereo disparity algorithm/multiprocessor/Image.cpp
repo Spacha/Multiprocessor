@@ -297,10 +297,11 @@ bool Image::filter(const Filter &filter)
  * @param size Size of the mask.
  * @return     True on success, false on fail.
  */
-bool Image::filterMean(size_t size)
+bool Image::filterMean(const size_t size)
 {
     // fill the mask with ones
-    float mask[size * size] = {0};
+    float *mask = (float*)malloc(size * size * sizeof(float));
+
     for (unsigned int i = 0; i < size * size; i++) { mask[i] = 1.0f; }
 
     const Filter filter((const size_t)size, (const float)(size * size), mask);
@@ -326,7 +327,7 @@ bool Image::downScale(unsigned int factor)
     // Since we cannot use even-sized kernels, use the
     // closest odd-numbered kernel size towards zero.
     // For example, if factor = 4 or 5 => maskSize = 5.
-    size_t maskSize = (factor % 2 == 0) ? factor + 1 : factor;
+    const size_t maskSize = (factor % 2 == 0) ? factor + 1 : factor;
 
     // filtering the image first gives a better downscaling quality
     this->filterMean(maskSize);

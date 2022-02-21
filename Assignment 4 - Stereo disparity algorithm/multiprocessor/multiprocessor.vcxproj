@@ -155,6 +155,7 @@
     <ClInclude Include="PerfTimer.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Filters.cpp" />
     <ClCompile Include="Image.cpp" />
     <ClCompile Include="lodepng.cpp" />
     <ClCompile Include="main.cpp" />
