@@ -1,5 +1,7 @@
 #pragma once
 
+#include <math.h>
+#include <array>
 #include "Application.hpp"
 #include "Filters.hpp"
 #include "MiniOCL.hpp"
@@ -80,6 +82,7 @@ public:
     void putPixel(unsigned int x, unsigned int y, Pixel pixel);
     void putPixel(unsigned int x, unsigned int y, unsigned char grey);
     Pixel getPixel(unsigned int x, unsigned int y);
+    unsigned char getGrayPixel(unsigned int x, unsigned int y);
     void printPixel(unsigned int x, unsigned int y);
 
     size_t sizeBytes();

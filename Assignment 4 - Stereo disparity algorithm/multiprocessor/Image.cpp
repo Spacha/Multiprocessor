@@ -299,18 +299,29 @@ bool Image::filter(const Filter &filter)
  */
 bool Image::filterMean(const size_t size)
 {
+    bool success = false;
+    if (size == 0) return false;
+
     // fill the mask with ones
-    float *mask = (float*)malloc(size * size * sizeof(float));
+    float *mask = (float*)malloc( size * size * sizeof(float) );
 
-    for (unsigned int i = 0; i < size * size; i++) { mask[i] = 1.0f; }
+    if (mask != NULL)
+    {
+        // populate the mask with ones
+        for (int i = 0; i < (size * size); i++) { mask[i] = 1.0f; }
 
-    const Filter filter((const size_t)size, (const float)(size * size), mask);
+        const Filter filter((const size_t)size, (const float)(size * size), mask);
+        success = this->filter(filter);
+    }
 
-    return this->filter(filter);
+    free(mask);
+    return success;
 }
 
 /**
- * Scales the image down by given integer factor.
+ * Scales the image down by given integer factor. Current implementation
+ * is quite rough: just blur using an averaging filter and then drop
+ * some pixels. In this case, however, it works very well.
  *
  * @todo Different factor for x and y would be easy.
  *
@@ -320,9 +331,6 @@ bool Image::filterMean(const size_t size)
 bool Image::downScale(unsigned int factor)
 {
     cout << "Resizing image... ";
-
-    // Current implementation is quite rough: just blur using
-    // an averaging filter and then drop some pixels.
 
     // Since we cannot use even-sized kernels, use the
     // closest odd-numbered kernel size towards zero.
@@ -385,12 +393,6 @@ public:
  */
 bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
 {
-    /*
-    Search parameters:
-        - left image (this), right image (otherImg)
-        - blockSize (B)
-        - dMax (d)
-    */
     bool success;
     cout << "Calculating ZNCC... ";
 
@@ -399,6 +401,94 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
     // NOTE: The avg should apparently be calculated of each patch
     // unsigned char leftAvg = this->grayAverage();        // = bar(I_L)
     // unsigned char rightAvg = otherImg.grayAverage();    // = bar(I_R)
+    const char windowSize = 20;
+    const char maxSearchDist = 55;
+
+    // TODO: should d be of opposite sign when comparing right-to-left?
+    for (int y = 0; y < this->height; y++) // 735
+    {
+        // = 735 iterations
+        for (int x = 0; x < this->width; x++) // 504
+        {
+            // work on pixel (x,y)
+            // = 370 thousands iterations
+            unsigned int bestDisp = 0;
+
+            for (int d = 0; d < maxSearchDist; d++) // 55
+            {
+                // work on search distance d for pixel (x,y)
+                // = 20 million iterations
+
+                unsigned int leftWindowAvg = 0;
+                unsigned int rightWindowAvg = 0;
+                unsigned int wN = 0;  // actual number of pixels in window; used in calculating the average
+                float maxCorrelation = 0.0f;
+
+                for (int wy = -(windowSize - 1)/2; wy <= (windowSize - 1)/2; wy++) // 20
+                {
+                    // = 407 million iterations
+                    for (int wx = -(windowSize - 1)/2; wx <= (windowSize - 1)/2; wx++) // 20
+                    {
+                        // work on search distance d for pixel (x,y), local window pixel (wx,wy)
+                        // = 8.1 billion iterations
+                        if ((x + wx) < 0 || x > (width - wx) || (y + wy) < 0 || y > (height - wy))  // prevent reading outside the image
+                            continue;
+
+                        leftWindowAvg  += this->getGrayPixel(x + wx, y + wy);
+                        rightWindowAvg += otherImg.getGrayPixel(x + wx, y + wy);
+                        cout << wN << " ";
+                        wN++;
+                    }
+                }
+
+                leftWindowAvg /= wN;
+                rightWindowAvg /= wN;
+
+                /* Calculate ZNCC */
+
+                int upperSum = 0;
+                unsigned int lowerLeftSum = 0;
+                unsigned int lowerRightSum = 0;
+
+                /* Calculate ZNCC(x, y, d) */
+                for (int wy = -(windowSize - 1)/2; wy <= (windowSize - 1)/2; wy++) // 20
+                {
+                    // = 407 million iterations
+                    for (int wx = -(windowSize - 1)/2; wx <= (windowSize - 1)/2; wx++) // 20
+                    {
+                        // work on search distance d for pixel (x,y), local window pixel (wx,wy)
+                        // = 8.1 billion iterations
+                        if ((x + wx) < 0 || x >= (width - wx) || (y + wy) < 0 || y >= (height - wy))  // prevent reading outside the image
+                            continue;
+
+                        // difference of (left/right) image pixel from the average
+                        char leftDiff  = this->getGrayPixel(x + wx, y + wy) - leftWindowAvg;
+                        char rightDiff = otherImg.getGrayPixel(x + wx - d, y + wy) - rightWindowAvg;
+
+                        upperSum += leftDiff * rightDiff;
+                        lowerLeftSum += leftDiff*leftDiff;      // leftDiff ^ 2
+                        lowerRightSum += rightDiff*rightDiff;   // rightDiff ^ 2
+                    }
+                }
+
+                // Finally calculate the ZNCC value
+                float correlation = (float)(upperSum / sqrt(lowerLeftSum) * sqrt(lowerRightSum));
+
+                // update disparity value for pixel (x,y)
+                if (correlation > maxCorrelation)
+                {
+                    maxCorrelation = correlation;
+                    bestDisp = d;
+                }
+            }
+
+            // put the best disparity value to the disparity map
+            disparityMap->putPixel(x, y, bestDisp);
+        }
+    }
+    // total of 2*8.1 billion = 16.2 billion iterations
+    // assuming each iteration takes 1000 cycles => 16 000 billion cycles
+    // assuming 3 GHz => 5333 seconds = 1 hour!
 
     // Do the magic...
     success = true;
@@ -562,6 +652,14 @@ Pixel Image::getPixel(unsigned int x, unsigned int y)
     // unsigned int i = 4*(y*width + x);
     const __int64 i = 4 * (y * width + x);
     return Pixel(image[i], image[i + 1], image[i + 2], image[i + 3]);
+}
+
+/**
+ * Returns the pixel value of the red channel in position (x,y).
+ */
+unsigned char Image::getGrayPixel(unsigned int x, unsigned int y)
+{
+    return image[y * width + x];
 }
 
 /**

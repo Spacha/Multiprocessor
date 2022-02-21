@@ -154,6 +154,11 @@ int main(int argc, char *argv[])
     success = leftImg->calcZNCC(*rightImg, leftDispImg);
     CHECK_ERROR(success, "Error calculating ZNCC for the left image.")
     success = rightImg->calcZNCC(*leftImg, rightDispImg);
+    ptimer.printTime();      // TODO: remove, this is for testing only!
+    cout << "Huh?" << endl;  // TODO: remove, this is for testing only!
+    return EXIT_SUCCESS;     // TODO: remove, this is for testing only!
+
+
     CHECK_ERROR(success, "Error calculating ZNCC for the right image.")
     ptimer.printTime();
 
