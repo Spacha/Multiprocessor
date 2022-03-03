@@ -114,6 +114,7 @@ int main(int argc, char *argv[])
     cout << "Right image '" << rightImgName << "', size "
          << rightImg->width << "x" << rightImg->height << "." << endl;
 
+#if 0
     // 2. Downscale (resize) the both images
     ptimer.reset();
     success = leftImg->downScale(downscaleFactor);
@@ -121,6 +122,7 @@ int main(int argc, char *argv[])
     success = rightImg->downScale(downscaleFactor);
     CHECK_ERROR(success, "Error downscaling the right image.")
     ptimer.printTime();
+#endif
 
     // 3. Convert both images to grayscale
     ptimer.reset();
@@ -151,8 +153,8 @@ int main(int argc, char *argv[])
     ptimer.reset();
     success = leftImg->calcZNCC(*rightImg, leftDispImg);
     CHECK_ERROR(success, "Error calculating ZNCC for the left image.")
-    success = rightImg->calcZNCC(*leftImg, rightDispImg);
-    CHECK_ERROR(success, "Error calculating ZNCC for the right image.")
+    //success = rightImg->calcZNCC(*leftImg, rightDispImg);
+    //CHECK_ERROR(success, "Error calculating ZNCC for the right image.")
     ptimer.printTime();
 
     // these have become unnecessary at this point
@@ -164,8 +166,8 @@ int main(int argc, char *argv[])
     ptimer.reset();
     success = leftDispImg->save("img/2-disparity-l.png");
     CHECK_ERROR(success, "Error saving the left image to disk.")
-    success = rightDispImg->save("img/2-disparity-r.png");
-    CHECK_ERROR(success, "Error saving the right image to disk.")
+    //success = rightDispImg->save("img/2-disparity-r.png");
+    //CHECK_ERROR(success, "Error saving the right image to disk.")
     ptimer.printTime();
 
     return 0;
