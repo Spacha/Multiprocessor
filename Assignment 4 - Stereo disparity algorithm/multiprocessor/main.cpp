@@ -114,7 +114,6 @@ int main(int argc, char *argv[])
     cout << "Right image '" << rightImgName << "', size "
          << rightImg->width << "x" << rightImg->height << "." << endl;
 
-#if 0
     // 2. Downscale (resize) the both images
     ptimer.reset();
     success = leftImg->downScale(downscaleFactor);
@@ -122,7 +121,6 @@ int main(int argc, char *argv[])
     success = rightImg->downScale(downscaleFactor);
     CHECK_ERROR(success, "Error downscaling the right image.")
     ptimer.printTime();
-#endif
 
     // 3. Convert both images to grayscale
     ptimer.reset();
@@ -158,10 +156,8 @@ int main(int argc, char *argv[])
     ptimer.printTime();
 
     // these have become unnecessary at this point
-    delete leftImg; // works only if we used: Image leftImage = new Image();
+    delete leftImg;
     delete rightImg;
-
-    // TODO: If we use OCL, put benchmark here.
 
     ptimer.reset();
     success = leftDispImg->save("img/2-disparity-l.png");
@@ -181,8 +177,6 @@ int main(int argc, char *argv[])
     delete leftDispImg;
     delete rightDispImg;
 
-    // TODO: If we use OCL, put benchmark here.
-
     ptimer.reset();
     success = finalImg.save("img/3-cross-checked.png");
     CHECK_ERROR(success, "Error saving image to disk.")
@@ -194,8 +188,6 @@ int main(int argc, char *argv[])
     success = finalImg.occlusionFill();
     CHECK_ERROR(success, "Error in occlusion filling.")
     ptimer.printTime();
-
-    // TODO: If we use OCL, put benchmark here.
 
     ptimer.reset();
     success = finalImg.save("img/4-occlusion-filled.png");

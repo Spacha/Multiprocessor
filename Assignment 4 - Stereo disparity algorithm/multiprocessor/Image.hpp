@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <array>
+#include <iomanip>  // setw
 #include "Application.hpp"
 #include "Filters.hpp"
 #include "MiniOCL.hpp"
@@ -86,6 +87,6 @@ public:
     void printPixel(unsigned int x, unsigned int y);
 
     size_t sizeBytes();
-    unsigned char grayAverage();
+    unsigned char grayAverage(unsigned int startX = 0, unsigned int startY = 0, size_t w = 0, size_t h = 0);
     bool validCoordinates(unsigned int x, unsigned int y);
 };
