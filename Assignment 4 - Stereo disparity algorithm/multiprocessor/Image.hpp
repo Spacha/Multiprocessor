@@ -74,7 +74,7 @@ public:
     bool filterMean(size_t size);
     //bool resize(size_t width, size_t height);
     bool downScale(unsigned int factor);
-    bool calcZNCC(Image &otherImg, Image *disparityMap);
+    bool calcZNCC(Image &otherImg, Image *disparityMap, bool reverse = false);
     bool crossCheck(Image &left, Image &right);
     bool occlusionFill();
 

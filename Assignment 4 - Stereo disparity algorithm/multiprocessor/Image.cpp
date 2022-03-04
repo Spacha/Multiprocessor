@@ -391,7 +391,7 @@ public:
  * @param disparityMap Pointer to a location to store the disparity map.
  * @return             True on success, false on fail.
  */
-bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
+bool Image::calcZNCC(Image &otherImg, Image *disparityMap, bool reverse /* = false */)
 {
     bool success;
     cout << "Calculating ZNCC... ";
@@ -415,6 +415,9 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
     // precalculate some...
     const char halfWindow = (windowSize - 1) / 2;
     const unsigned int pixelsPerWindow = windowSize * windowSize;
+
+    // d moves to another direction
+    char dir = reverse ? 1 : -1;
 
     // DEV
     float progress = 0.0f;
@@ -483,7 +486,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap)
                         // difference of (left/right) image pixel from the average
                         // TODO: THIS TOO, NOT NECESSARY FOR EVERY D!
                         char leftDiff  = this->getGrayPixel(x + wx, y + wy) - leftAvg; // leftWindowAvg;
-                        char rightDiff = otherImg.getGrayPixel(x + wx - d, y + wy) - rightAvg; // rightWindowAvg;
+                        char rightDiff = otherImg.getGrayPixel(x + wx + (dir * d), y + wy) - rightAvg; // rightWindowAvg;
 
                         upperSum      += leftDiff * rightDiff;
                         lowerLeftSum  += leftDiff * leftDiff;     // leftDiff ^ 2
@@ -658,7 +661,28 @@ bool Image::occlusionFill()
     bool success;
     cout << "Performing occlusion fill... ";
 
-    // ...
+    for (unsigned int y = 0; y < this->height; y++)
+    {
+        for (unsigned int x = 0; x < this->width; x++)
+        {
+            unsigned char p = this->getGrayPixel(x, y);
+
+            if (p > 0) continue;
+
+            for (int x0 = x; x0 >= 0; x0--)
+            {
+                unsigned char p0 = this->getGrayPixel(x0, y);
+
+                if (p0 > 0)
+                {
+                    // replace current pixel (that is zero) with p0
+                    this->putPixel(x, y, p0);
+                    break;
+                }
+            }
+        }
+    }
+
     success = true;
 
     cout << "Done." << endl;
