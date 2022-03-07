@@ -378,7 +378,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, bool reverse /* = fal
     //unsigned char leftAvg = this->grayAverage();
     //unsigned char rightAvg = otherImg.grayAverage();
     const char windowSize = 15;
-    const char maxSearchD = 55; // 55
+    const char maxSearchD = 55;
 
     if (windowSize % 2 == 0)
     {

@@ -1,3 +1,6 @@
+# OBS: Should normalize the values to range 0-255.
+
+
 # Stereo Disparity (assignment 4) notes
 
 # Methods

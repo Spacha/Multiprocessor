@@ -1,0 +1,6 @@
+# Assignment 5 - notes
+
+First, just make a barely functional version. Then, after both versions
+(pthreads and OpenCL) are working, maybe try to optimize it so that you minimize
+moving data between the compute device memory and host device memory.
+
