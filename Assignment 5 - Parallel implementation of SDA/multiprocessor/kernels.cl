@@ -101,7 +101,6 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
     }
 
     // Calculate left window average.
-
     float windowSum = 0;
     float4 clr;
     for (unsigned int y = pos.y - halfWindow; y < pos.y + halfWindow; y++)
@@ -122,8 +121,64 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
         ? min((int)maxSearchD, (int)((w - 1 - halfWindow) - pos.x))
         : min((int)maxSearchD, (int)(pos.x - halfWindow));
 
+    for (int d = 0; d <= maxD; d++)
+    {
+         // Calculate right window average.
+        windowSum = 0;
+        for (unsigned int y = pos.y - halfWindow; y < pos.y + halfWindow; y++)
+        {
+            for (unsigned int x = pos.x + (dir * d) - halfWindow; x < pos.x + (dir * d) + halfWindow; x++)
+            {
+                clr = read_imagef( in_other, sampler, (int2)(x, y) );
+                windowSum += clr[0];
+            }
+        }
+        float rightAvg = (windowSum / (windowSize*windowSize));
+
+        /* Calculate ZNCC */
+
+        float upperSum = 0;
+        float lowerLeftSum = 0;
+        float lowerRightSum = 0;
+
+        /* Calculate ZNCC(x, y, d) */
+        for (int wy = -halfWindow; wy <= halfWindow; wy++)
+        {
+            for (int wx = -halfWindow; wx <= halfWindow; wx++)
+            {
+                // difference of (left/right) image pixel from the average
+                // TODO: Not necessary for each d!
+                //char leftDiff  = this->getGrayPixel(x + wx, y + wy) - leftAvg;
+                clr = read_imagef( in_this, sampler, (int2)(pos.x + wx, pos.y + wy) );
+                float leftDiff = clr[0] - leftAvg;
+                //char rightDiff = args->otherImg.getGrayPixel(x + wx + (args->dir * d), y + wy) - rightAvg;
+                clr = read_imagef( in_other, sampler, (int2)(pos.x + wx + (dir * d), pos.y + wy) );
+                float rightDiff = clr[0] - rightAvg;
+
+                upperSum      += leftDiff * rightDiff;
+                lowerLeftSum  += leftDiff * leftDiff;     // leftDiff ^ 2
+                lowerRightSum += rightDiff * rightDiff;   // rightDiff ^ 2
+            }
+        }
+
+        // Finally calculate the ZNCC value
+        float correlation = (float)(upperSum / (sqrt(lowerLeftSum) * sqrt(lowerRightSum)));
+
+        // update disparity value for pixel (x,y)
+        if (correlation > maxCorrelation)
+        {
+            maxCorrelation = correlation;
+            bestD = d;
+        }
+
+        // put the best disparity value to the disparity map
+        //args->disparityMap->putPixel(x, y, bestD);
+        float p = bestD / 255.0f;
+        write_imagef( out, pos, (float4)(p, p, p, 1.0f) );
+    }
+
     //float4 clr1 = read_imagef( in_this, sampler, pos );
     //float4 clr2 = read_imagef( in_other, sampler, pos );
     //float4 clr = (float4)((clr1 + clr2) / 2);
-    write_imagef( out, pos, (float4)(leftAvg, leftAvg, leftAvg, 1.0f) );
+    //write_imagef( out, pos, (float4)(leftAvg, leftAvg, leftAvg, 1.0f) );
 }

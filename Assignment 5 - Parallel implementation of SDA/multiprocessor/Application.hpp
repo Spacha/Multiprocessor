@@ -23,7 +23,7 @@
  * TARGET_CPU      = OpenCL on CPU
  * TARGET_PTHREAD  = Threaded on CPU
  */
-#define COMPUTE_DEVICE TARGET_PTHREAD
+#define COMPUTE_DEVICE TARGET_GPU
 
 /**
  * Number of parallel threads. Used only COMPUTE_DEVICE == TARGET_PTHREAD.
