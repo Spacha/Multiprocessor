@@ -422,6 +422,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
         5, (void *)&args->maxSearchD, sizeof(unsigned int));                // max search distance
 
     success = ocl->executeKernel(width, height, 16, 16);
+    cout << "DO WE NEED TO HAVE LARGER LOCAL SIZE FOR LARGER WINDOW SIZES??" << endl;
 
     if (!success)
         return false;
@@ -429,14 +430,19 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
 #else /* Use Pthread or no parallelization. */
 # ifdef USE_THREADS /* Use Pthread */
 
-    pthread_t threads[NUM_THREADS];
-    ZNCCArgs *args[NUM_THREADS];
+    pthread_t threads[NUM_THREADS];     // holds the thread handles
+    ZNCCArgs *args[NUM_THREADS];        // holds the thread arguments
 
     // For example, 8 threads.
     // We will divide the image to NUM_THREADS equal horizontal strips.
     // Each strip is a working area of one thread.
     // The height of each strip must be LARGER THAN OR EQUAL TO the window size.
-    // Therefore it must be: this->height >= NUM_THREADS * windowSize.
+    if (this->height <= NUM_THREADS * windowSize)
+    {
+        cout << "Error! Too small picture for " << NUM_THREADS << " threads!" << endl;
+        return false; // TODO: free args still...
+    }
+
     unsigned int rowsPerThread = this->height / NUM_THREADS; // 504 / 8 = 63
     unsigned int fromY = halfWindow;
     unsigned int toY = rowsPerThread - 1;
@@ -460,15 +466,18 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
             toY -= halfWindow;
     }
 
+    // Wait for threads to finish; after finish, delete its argument struct.
     for(int i = 0; i < NUM_THREADS; i++)
     {
         pthread_join(threads[i], NULL);
-        cout << "Thread " << i << " joined." << endl;
+        cout << "Thread " << i << " done." << endl;
         delete args[i];
     }
 
 # else /* No parallelization */
 
+    // Execute in a single "thread" using the same
+    // proxy as the Pthread implementation.
     calculateZNCC_thread_proxy(args);
 
 # endif
@@ -483,7 +492,14 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
 }
 
 /**
- * ...............
+ * This is the thread that performs the ZNCC (disparity) calculation. This can
+ * be used either for sequential or threaded implementation. The args struct
+ * defines how the calculation is done. In case of sequential implementation,
+ * args defines the whole image as a calculation area, whereas in threaded
+ * version, the image is split to horizontal "strips".
+ * 
+ * @param ZNCCArgs args Pointer to the structure containing the arguments.
+ * @return nullptr
  */
 void *Image::calculateZNCC_thread(ZNCCArgs *args)
 {
@@ -500,8 +516,8 @@ void *Image::calculateZNCC_thread(ZNCCArgs *args)
         for (unsigned int x = halfWindow; x < (this->width - halfWindow); x++)
         {
             unsigned int leftAvg = this->grayAverage(
-                x - args->windowSize,
-                y - args->windowSize,
+                x - halfWindow,
+                y - halfWindow,
                 args->windowSize,
                 args->windowSize);
 
@@ -517,8 +533,8 @@ void *Image::calculateZNCC_thread(ZNCCArgs *args)
             for (int d = 0; d <= maxD; d++)
             {
                 unsigned int rightAvg = args->otherImg.grayAverage(
-                    x - args->windowSize + (args->dir * d),
-                    y - args->windowSize,
+                    x - halfWindow + (args->dir * d),
+                    y - halfWindow,
                     args->windowSize,
                     args->windowSize);
 
@@ -575,8 +591,12 @@ void *Image::calculateZNCC_thread(ZNCCArgs *args)
 }
 
 /**
- * Proxys the call to the actual thread function. This is used to
- * extract the Image context before calling the method.
+ * Proxies the call to the actual thread function. This is used to
+ * extract the Image context before calling the method. This is necessary, as
+ * the pthread_create interface is quite strict.
+ * 
+ * @param ZNCCArgs args Pointer to the structure containing the arguments.
+ * @return nullptr
  **/
 void *calculateZNCC_thread_proxy(void *args)
 {

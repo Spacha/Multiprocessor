@@ -79,30 +79,51 @@ __kernel void filter(__read_only image2d_t in,
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- * ...
+ * NOTE: Assumes grayscale image.
  **/
 __kernel void calc_zncc(__read_only image2d_t in_this,
                         __read_only image2d_t in_other,
                         __write_only image2d_t out,
-                        char window_size,
+                        char windowSize,
                         char dir,
-                        unsigned int max_search_d)
+                        unsigned int maxSearchD)
 {
     int2 pos = (int2)(get_global_id(0), get_global_id(1));
-
     float w = get_image_width(in_this);
     float h = get_image_height(in_this);
+    const char halfWindow = (windowSize - 1) / 2;
 
-    if (pos.x >= w || pos.y >= h)
+    // skip the edges
+    if (pos.x < halfWindow || pos.y < halfWindow ||
+        pos.x >= (w - halfWindow) || pos.y >= (h - halfWindow))
     {
         return;
     }
 
-    //float4 clr = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
-    float4 clr1 = read_imagef( in_this, sampler, pos );
-    float4 clr2 = read_imagef( in_other, sampler, pos );
+    // Calculate left window average.
 
-    float4 clr = (float4)((clr1 + clr2) / 2);
+    float windowSum = 0;
+    float4 clr;
+    for (unsigned int y = pos.y - halfWindow; y < pos.y + halfWindow; y++)
+    {
+        for (unsigned int x = pos.x - halfWindow; x < pos.x + halfWindow; x++)
+        {
+            clr = read_imagef( in_this, sampler, (int2)(x, y) );
+            windowSum += clr[0];
+        }
+    }
+    float leftAvg = (windowSum / (windowSize*windowSize));
 
-    write_imagef( out, pos, clr );
+    unsigned char bestD = 0;        // tracks the distance with best correlation
+    float maxCorrelation = 0.0f;    // tracks the best correlation (ZNCC)
+
+    // stops at the left/right edge (OpenCL defines generic integer min and max)
+    char maxD = (dir > 0)
+        ? min((int)maxSearchD, (int)((w - 1 - halfWindow) - pos.x))
+        : min((int)maxSearchD, (int)(pos.x - halfWindow));
+
+    //float4 clr1 = read_imagef( in_this, sampler, pos );
+    //float4 clr2 = read_imagef( in_other, sampler, pos );
+    //float4 clr = (float4)((clr1 + clr2) / 2);
+    write_imagef( out, pos, (float4)(leftAvg, leftAvg, leftAvg, 1.0f) );
 }

@@ -13,9 +13,11 @@
 # include <pthread.h>
 #endif /* USE_THREADS */
 
-/* TEMP: Forward declaration. */
+/* Forward declarations. */
 struct ZNCCArgs;
 typedef struct ZNCCArgs ZNCCArgs;
+
+void *calculateZNCC_thread_proxy(void *args);
 
 /* Struct representing a pixel (0-255) */
 struct Pixel
