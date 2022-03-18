@@ -3,11 +3,15 @@
 #include <math.h>
 #include <array>
 #include <iomanip>          // setw
-#include <pthread.h>        // Only ifdef USE_THREADS
 #include "Application.hpp"
 #include "Filters.hpp"
 #include "MiniOCL.hpp"
 #include "lodepng.h"
+
+#ifdef USE_THREADS
+# define HAVE_STRUCT_TIMESPEC /* Required in VC++, I guess... */
+# include <pthread.h>
+#endif /* USE_THREADS */
 
 /* TEMP: Forward declaration. */
 struct ZNCCArgs;
@@ -99,7 +103,6 @@ public:
     bool validCoordinates(unsigned int x, unsigned int y);
 };
 
-
 /* TEMPORARY */
 struct ZNCCArgs
 {
@@ -113,7 +116,6 @@ struct ZNCCArgs
     Image otherImg;
     Image *disparityMap;
 
-    //      (int&,    const char&,           unsigned int&,      unsigned int&,    char&,                             Image*&,      , Image&,         Image*&)
     ZNCCArgs(int tid, const char windowSize, unsigned int fromY, unsigned int toY, char dir, unsigned int maxSearchD, Image *thisImg, Image otherImg, Image *disparityMap)
         : tid(tid), windowSize(windowSize), fromY(fromY), toY(toY), dir(dir), maxSearchD(maxSearchD), thisImg(thisImg), otherImg(otherImg), disparityMap(disparityMap) {}
 };

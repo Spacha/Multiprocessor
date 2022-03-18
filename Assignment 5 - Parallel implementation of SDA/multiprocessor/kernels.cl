@@ -73,3 +73,36 @@ __kernel void filter(__read_only image2d_t in,
 
     write_imagef( out, center, (float4)(clr / divisor) );
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// CALCULATE ZNCC KERNEL
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * ...
+ **/
+__kernel void calc_zncc(__read_only image2d_t in_this,
+                        __read_only image2d_t in_other,
+                        __write_only image2d_t out,
+                        char window_size,
+                        char dir,
+                        unsigned int max_search_d)
+{
+    int2 pos = (int2)(get_global_id(0), get_global_id(1));
+
+    float w = get_image_width(in_this);
+    float h = get_image_height(in_this);
+
+    if (pos.x >= w || pos.y >= h)
+    {
+        return;
+    }
+
+    //float4 clr = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+    float4 clr1 = read_imagef( in_this, sampler, pos );
+    float4 clr2 = read_imagef( in_other, sampler, pos );
+
+    float4 clr = (float4)((clr1 + clr2) / 2);
+
+    write_imagef( out, pos, clr );
+}

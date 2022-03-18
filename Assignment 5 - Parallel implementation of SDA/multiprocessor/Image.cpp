@@ -282,7 +282,6 @@ bool Image::filter(const Filter &filter)
         }
     }
 
-    cout << "Check if can divide alpha too, then REMOVE THIS COMMENT" << endl;
     // update the image
     this->replace(tempImage);
 
@@ -365,17 +364,135 @@ bool Image::downScale(unsigned int factor)
     return true;
 }
 
+/**
+ * Calculates the disparity map of the image compared to
+ * another image. The disparity map replaces the current image.
+ * 
+ * @param otherImg     The image to be compared against.
+ * @param disparityMap Pointer to a location to store the disparity map.
+ * @param reverse      Traverse the right image to right instead of left.
+ * @return             True on success, false on fail.
+ */
+bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSize, unsigned int maxSearchD, bool reverse /* = false */)
+{
+    /**
+     * This method has three different calculation methods:
+     * 1. Sequential (normal CPU execution).
+     * 2. Parallel on CPU, using Pthread.
+     * 3. Parallel on GPU or CPU, using OpenCL.
+     */
+    disparityMap->createEmpty(otherImg.width, otherImg.height);
+
+    if (windowSize % 2 == 0)
+    {
+        cout << "Window size must be odd." << endl;
+        return false;
+    }
+
+    const char halfWindow = (windowSize - 1) / 2;
+    char dir = reverse ? 1 : -1;  // d = -1 -> move left (default), d = +1 -> move right
+
+#ifndef USE_THREADS
+    // arguments for calculating the whole picture in one thread
+    ZNCCArgs *args = new ZNCCArgs(0, windowSize, halfWindow, this->height - halfWindow - 1, dir, maxSearchD, this, otherImg, disparityMap);
+#endif
+
+#ifdef USE_OCL /* OpenCL (GPU or CPU) */
+
+    bool success;
+
+    if (!this->ocl) {
+        cout << "Cannot do parallel execution without instance of MiniOCL." << endl;
+        return false;
+    }
+
+    success = this->ocl->buildKernel("calc_zncc");
+
+    ocl->setInputImageBuffer(
+        0, static_cast<void *>(image.data()), width, height);               // this image in
+    ocl->setInputImageBuffer(
+        1, static_cast<void *>(otherImg.image.data()), width, height);      // other image in
+    ocl->setOutputImageBuffer(
+        2, static_cast<void *>(disparityMap->image.data()), width, height); // image out (disparity map)
+    ocl->setValue(
+        3, (void *)&args->windowSize, sizeof(const char));                  // window size
+    ocl->setValue(
+        4, (void *)&args->dir, sizeof(char));                               // direction
+    ocl->setValue(
+        5, (void *)&args->maxSearchD, sizeof(unsigned int));                // max search distance
+
+    success = ocl->executeKernel(width, height, 16, 16);
+
+    if (!success)
+        return false;
+
+#else /* Use Pthread or no parallelization. */
+# ifdef USE_THREADS /* Use Pthread */
+
+    pthread_t threads[NUM_THREADS];
+    ZNCCArgs *args[NUM_THREADS];
+
+    // For example, 8 threads.
+    // We will divide the image to NUM_THREADS equal horizontal strips.
+    // Each strip is a working area of one thread.
+    // The height of each strip must be LARGER THAN OR EQUAL TO the window size.
+    // Therefore it must be: this->height >= NUM_THREADS * windowSize.
+    unsigned int rowsPerThread = this->height / NUM_THREADS; // 504 / 8 = 63
+    unsigned int fromY = halfWindow;
+    unsigned int toY = rowsPerThread - 1;
+
+    for (int i = 0; i < NUM_THREADS; i++)
+    {
+        // threadId, windowSize, dir, maxSearchD, fromY, toY, thisImg, otherImg, disparityMap
+        args[i] = new ZNCCArgs(i, windowSize, fromY, toY, dir, maxSearchD, this, otherImg, disparityMap);
+        int err = pthread_create(&threads[i], NULL, calculateZNCC_thread_proxy, (void *)args[i]);
+        if (err) {
+            cout << "Error! Unable to create thread: " << err << endl;
+            break;
+        }
+        cout << "Thread " << i << " created." << endl;
+
+        fromY = toY + 1;
+        toY = fromY + rowsPerThread - 1;
+
+        // if next is the last thread (lowest part)
+        if (i == (NUM_THREADS - 2))
+            toY -= halfWindow;
+    }
+
+    for(int i = 0; i < NUM_THREADS; i++)
+    {
+        pthread_join(threads[i], NULL);
+        cout << "Thread " << i << " joined." << endl;
+        delete args[i];
+    }
+
+# else /* No parallelization */
+
+    calculateZNCC_thread_proxy(args);
+
+# endif
+#endif
+
+#ifndef USE_THREADS
+    delete args;
+#endif
+
+    cout << "Calculating ZNCC... Done.\r" << endl;
+    return true;
+}
+
+/**
+ * ...............
+ */
 void *Image::calculateZNCC_thread(ZNCCArgs *args)
 {
-    //ZNCCArgs *args = static_cast<ZNCCArgs*>(args);
-
-    //cout << "Hello World! I'm thread ID " << args->tid << "!" << endl;
-
-    // precalculate some...
     const char halfWindow = (args->windowSize - 1) / 2;
 
-    //float progress = 0.0f;
-    //float progressPerRound = 1.0f / this->height;
+#ifndef USE_THREADS
+    float progress = 0.0f;
+    float progressPerRound = 1.0f / this->height;
+#endif /* !USE_THREADS */
 
     for (unsigned int y = args->fromY; y <= args->toY; y++)
     {
@@ -444,189 +561,27 @@ void *Image::calculateZNCC_thread(ZNCCArgs *args)
             // put the best disparity value to the disparity map
             args->disparityMap->putPixel(x, y, bestD);
         }
-        //progress += progressPerRound;
-        //cout << "Calculating ZNCC... " << (unsigned int)(100 * progress) << " %\r" << std::flush;
+#ifndef USE_THREADS
+        progress += progressPerRound;
+        cout << "Calculating ZNCC... " << (unsigned int)(100 * progress) << " %\r" << std::flush;
+#endif /* !USE_THREADS */
     }
 
+#ifdef USE_THREADS
     pthread_exit(NULL);
+#endif /* USE_THREADS */
 
     return nullptr;
 }
+
 /**
  * Proxys the call to the actual thread function. This is used to
  * extract the Image context before calling the method.
  **/
-void *calculateStripZNCC_thread_proxy(void *args)
+void *calculateZNCC_thread_proxy(void *args)
 {
     ZNCCArgs *a = static_cast<ZNCCArgs*>(args);
     return static_cast<Image*>(a->thisImg)->calculateZNCC_thread(static_cast<ZNCCArgs*>(a));
-}
-
-/**
- * Calculates the disparity map of the image compared to
- * another image. The disparity map replaces the current image.
- * 
- * @param otherImg     The image to be compared against.
- * @param disparityMap Pointer to a location to store the disparity map.
- * @param reverse      Traverse the right image to right instead of left.
- * @return             True on success, false on fail.
- */
-bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSize, unsigned int maxSearchD, bool reverse /* = false */)
-{
-    disparityMap->createEmpty(otherImg.width, otherImg.height);
-
-    //unsigned char leftAvg = this->grayAverage();
-    //unsigned char rightAvg = otherImg.grayAverage();
-    // const char windowSize = 15;
-    // const char maxSearchD = 55;
-
-    if (windowSize % 2 == 0)
-    {
-        cout << "Window size must be odd." << endl;
-        return false;
-    }
-
-#ifdef USE_OCL /* Use OpenCL */
-
-    cout << "CalcZNCC Not implemented for OpenCL." << endl;
-    return false;
-
-#else
-# ifdef USE_THREADS /* Use Pthread */
-
-    pthread_t threads[NUM_THREADS];
-    ZNCCArgs *args[NUM_THREADS];
-
-    // precalculate some...
-    const char halfWindow = (windowSize - 1) / 2;
-
-    // d = -1 -> move left (default), d = +1 -> move right
-    char dir = reverse ? 1 : -1;
-
-    //float progress = 0.0f;
-    //float progressPerRound = 1.0f / this->height;
-
-    // For example, 8 threads.
-    // We will divide the image to NUM_THREADS equal horizontal strips.
-    // Each strip is a working area of one thread.
-    // The height of each strip must be LARGER THAN OR EQUAL TO the window size.
-    // Therefore it must be: this->height >= NUM_THREADS * windowSize.
-    unsigned int rowsPerThread = this->height / NUM_THREADS; // 504 / 8 = 63
-    unsigned int fromY = halfWindow;
-    unsigned int toY = rowsPerThread - 1;
-
-    for (int i = 0; i < NUM_THREADS; i++)
-    {
-        // threadId, windowSize, dir, maxSearchD, fromY, toY, thisImg, otherImg, disparityMap
-        args[i] = new ZNCCArgs(i, windowSize, fromY, toY, dir, maxSearchD, this, otherImg, disparityMap);
-        int err = pthread_create(&threads[i], NULL, calculateStripZNCC_thread_proxy, (void *)args[i]);
-        if (err) {
-            cout << "Error! Unable to create thread: " << err << endl;
-            break;
-        }
-        cout << "Thread " << i << " created." << endl;
-
-        fromY = toY + 1;
-        toY = fromY + rowsPerThread - 1;
-
-        // if next is the last thread (lowest part)
-        if (i == (NUM_THREADS - 2))
-            toY -= halfWindow;
-    }
-
-    for(int i = 0; i < NUM_THREADS; i++)
-    {
-        pthread_join(threads[i], NULL);
-        cout << "Thread " << i << " joined." << endl;
-        delete args[i];
-    }
-
-# else /* No parallelization */
-
-    // precalculate some...
-    const char halfWindow = (windowSize - 1) / 2;
-
-    // d = -1 -> move left (default), d = +1 -> move right
-    char dir = reverse ? 1 : -1;
-
-    float progress = 0.0f;
-    float progressPerRound = 1.0f / this->height;
-
-    for (unsigned int y = halfWindow; y < (this->height - halfWindow); y++)
-    {
-        for (unsigned int x = halfWindow; x < (this->width - halfWindow); x++)
-        {
-            unsigned int leftAvg = this->grayAverage(
-                x - windowSize,
-                y - windowSize,
-                windowSize,
-                windowSize);
-
-            unsigned char bestD = 0;        // tracks the distance with best correlation
-            float maxCorrelation = 0.0f;    // tracks the best correlation (ZNCC)
-
-            // stops at the left/right edge
-            char maxD = reverse
-                ? std::min((int)maxSearchD, (int)((this->width - 1 - halfWindow) - x))
-                : std::min((int)maxSearchD, (int)(x - halfWindow));
-                //: std::min((int)(this->width - 1 - maxSearchD), (int)(this->width - 1 - x - halfWindow));
-
-            for (int d = 0; d <= maxD; d++)
-            {
-                unsigned int rightAvg = otherImg.grayAverage(
-                    x - windowSize + (dir * d),
-                    y - windowSize,
-                    windowSize,
-                    windowSize);
-
-                /* Calculate ZNCC */
-
-                int upperSum = 0;
-                unsigned int lowerLeftSum = 0;
-                unsigned int lowerRightSum = 0;
-
-                //cout << "getting (" << x << ", " << y << ")";
-                // getting(48, 64)
-                /* Calculate ZNCC(x, y, d) */
-                for (int wy = -halfWindow; wy <= halfWindow; wy++) // 20
-                {
-                    for (int wx = -halfWindow; wx <= halfWindow; wx++) // 20
-                    {
-                        // difference of (left/right) image pixel from the average
-                        // TODO: Not necessary for each d!
-                        char leftDiff  = this->getGrayPixel(x + wx, y + wy) - leftAvg;
-                        char rightDiff = otherImg.getGrayPixel(x + wx + (dir * d), y + wy) - rightAvg;
-
-                        upperSum      += leftDiff * rightDiff;
-                        lowerLeftSum  += leftDiff * leftDiff;     // leftDiff ^ 2
-                        lowerRightSum += rightDiff * rightDiff;   // rightDiff ^ 2
-                    }
-                }
-                //cout << " done" << endl;
-
-                // Finally calculate the ZNCC value
-                float correlation = (float)(upperSum / (sqrt(lowerLeftSum) * sqrt(lowerRightSum)));
-
-                // update disparity value for pixel (x,y)
-                if (correlation > maxCorrelation)
-                {
-                    maxCorrelation = correlation;
-                    bestD = d;
-                }
-            }
-
-            // put the best disparity value to the disparity map
-            disparityMap->putPixel(x, y, bestD);
-        }
-        progress += progressPerRound;
-        cout << "Calculating ZNCC... " << (unsigned int)(100 * progress) << " %\r" << std::flush;
-    }
-
-# endif
-#endif
-
-    cout << "Calculating ZNCC... Done.\r" << endl;
-    return true;
 }
 
 /**
