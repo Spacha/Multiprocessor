@@ -2,11 +2,16 @@
 
 #include <math.h>
 #include <array>
-#include <iomanip>  // setw
+#include <iomanip>          // setw
+#include <pthread.h>        // Only ifdef USE_THREADS
 #include "Application.hpp"
 #include "Filters.hpp"
 #include "MiniOCL.hpp"
 #include "lodepng.h"
+
+/* TEMP: Forward declaration. */
+struct ZNCCArgs;
+typedef struct ZNCCArgs ZNCCArgs;
 
 /* Struct representing a pixel (0-255) */
 struct Pixel
@@ -79,6 +84,9 @@ public:
     bool crossCheck(Image &left, Image &right);
     bool occlusionFill();
 
+    // TEMP
+    void *calculateZNCC_thread(ZNCCArgs *args);
+
     // helper methods
     void putPixel(unsigned int x, unsigned int y, Pixel pixel);
     void putPixel(unsigned int x, unsigned int y, unsigned char grey);
@@ -89,4 +97,23 @@ public:
     size_t sizeBytes();
     unsigned char grayAverage(unsigned int startX = 0, unsigned int startY = 0, size_t w = 0, size_t h = 0);
     bool validCoordinates(unsigned int x, unsigned int y);
+};
+
+
+/* TEMPORARY */
+struct ZNCCArgs
+{
+    int tid;
+    const char windowSize;
+    unsigned int fromY;
+    unsigned int toY;
+    char dir;
+    unsigned int maxSearchD;
+    Image *thisImg;
+    Image otherImg;
+    Image *disparityMap;
+
+    //      (int&,    const char&,           unsigned int&,      unsigned int&,    char&,                             Image*&,      , Image&,         Image*&)
+    ZNCCArgs(int tid, const char windowSize, unsigned int fromY, unsigned int toY, char dir, unsigned int maxSearchD, Image *thisImg, Image otherImg, Image *disparityMap)
+        : tid(tid), windowSize(windowSize), fromY(fromY), toY(toY), dir(dir), maxSearchD(maxSearchD), thisImg(thisImg), otherImg(otherImg), disparityMap(disparityMap) {}
 };
