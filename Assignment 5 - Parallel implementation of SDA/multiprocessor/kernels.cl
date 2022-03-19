@@ -184,7 +184,7 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
 __kernel void cross_check(__read_only image2d_t in_left,
                           __read_only image2d_t in_right,
                           __write_only image2d_t out,
-                          unsigned char threshold)
+                          unsigned int threshold)
 {
     int2 pos = (int2)(get_global_id(0), get_global_id(1));
 

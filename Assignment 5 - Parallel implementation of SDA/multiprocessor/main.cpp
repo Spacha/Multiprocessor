@@ -7,13 +7,6 @@
 using std::cout;
 using std::endl;
 
-/**
- * Compile & run:
- *   cls && g++ main.cpp MiniOCL.cpp lodepng.cpp %OCL_ROOT%/lib/x86_64/opencl.lib -Wall -I %OCL_ROOT%\include -o image-filter.exe && image-filter.exe img/im0.png
- * OR
- *   cls && make && stereo.exe img/im0.png img/im1.png [windowSize [maxSearchD]]
- **/
-
 ///////////////////////////////////////////////////////////////////////////////
 // DEFINITIONS & MACROS
 ///////////////////////////////////////////////////////////////////////////////
@@ -32,7 +25,6 @@ using std::endl;
 ///////////////////////////////////////////////////////////////////////////////
 
 const char *kernelFileName = "kernels.cl";
-// const std::string imgName  = "img/simple.png";
 
 ///////////////////////////////////////////////////////////////////////////////
 // HELPER FUNCTIONS
@@ -72,6 +64,7 @@ int main(int argc, char *argv[])
     std::string rightImgName;
     unsigned int windowSize = 9;
     unsigned int maxSearchD = 32;
+    unsigned int ccThreshold = 8;
     unsigned int downscaleFactor = 4;
 
     Image *leftImg = new Image();               // left stereo image
@@ -90,7 +83,9 @@ int main(int argc, char *argv[])
         if (argc > 4)
             maxSearchD = (unsigned int)atoi( argv[4] );
         if (argc > 5)
-            downscaleFactor = (unsigned int)atoi( argv[5] );
+            ccThreshold = (unsigned int)atoi( argv[5] );
+        if (argc > 6)
+            downscaleFactor = (unsigned int)atoi( argv[6] );
     }
     else
     {
@@ -189,7 +184,7 @@ int main(int argc, char *argv[])
     // 5. Cross checking
 
     ptimer.reset();
-    finalImg.crossCheck(*leftDispImg, *rightDispImg);
+    finalImg.crossCheck(*leftDispImg, *rightDispImg, ccThreshold);
     CHECK_ERROR(success, "Error in cross checking.")
     ptimer.printTime();
 

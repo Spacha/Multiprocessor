@@ -394,7 +394,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
 
 #ifndef USE_THREADS
     // arguments for calculating the whole picture in one thread
-    ZNCCArgs *args = new ZNCCArgs(0, windowSize, halfWindow, this->height - halfWindow - 1, dir, maxSearchD, this, otherImg, disparityMap);
+    ZNCCArgs *args = new ZNCCArgs(0, windowSize, halfWindow, (unsigned int)this->height - halfWindow - 1, dir, maxSearchD, this, otherImg, disparityMap);
 #endif
 
 #ifdef USE_OCL /* OpenCL (GPU or CPU) */
@@ -422,7 +422,6 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
         5, (void *)&args->maxSearchD, sizeof(unsigned int));                // max search distance
 
     success = ocl->executeKernel(width, height, 16, 16);
-    cout << "EXPERIMENT WITH DIFFERENT WORK GROUP SIZES!" << endl;
 
     if (!success)
         return false;
@@ -498,7 +497,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
  * args defines the whole image as a calculation area, whereas in threaded
  * version, the image is split to horizontal "strips".
  * 
- * @param ZNCCArgs args Pointer to the structure containing the arguments.
+ * @param args  Pointer to the structure containing the arguments.
  * @return nullptr
  */
 void *Image::calculateZNCC_thread(ZNCCArgs *args)
@@ -595,7 +594,7 @@ void *Image::calculateZNCC_thread(ZNCCArgs *args)
  * extract the Image context before calling the method. This is necessary, as
  * the pthread_create interface is quite strict.
  * 
- * @param ZNCCArgs args Pointer to the structure containing the arguments.
+ * @param args  Pointer to the structure containing the arguments.
  * @return nullptr
  **/
 void *calculateZNCC_thread_proxy(void *args)
@@ -608,11 +607,12 @@ void *calculateZNCC_thread_proxy(void *args)
  * Performs a cross-checking for two disparity maps of the same size.
  * The result is stored as an image.
  * 
- * @param left   The left-to-right disparity map.
- * @param right  The right-to-left disparity map.
- * @return       True on success, false on fail.
+ * @param left       The left-to-right disparity map.
+ * @param right      The right-to-left disparity map.
+ * @param threshold  The difference threshold. Default is 8.
+ * @return           True on success, false on fail.
  */
-bool Image::crossCheck(Image &left, Image &right)
+bool Image::crossCheck(Image &left, Image &right, unsigned int threshold /* = 8 */)
 {
     /*
     Cross checking is a process where you compare two depth maps.
@@ -642,8 +642,6 @@ bool Image::crossCheck(Image &left, Image &right)
 
     this->createEmpty(left.width, left.height);
 
-    unsigned char threshold = 8;
-
 #ifdef USE_OCL /* OpenCL (GPU or CPU) */
 
     if (!ocl) {
@@ -660,10 +658,9 @@ bool Image::crossCheck(Image &left, Image &right)
     ocl->setOutputImageBuffer(
         2, static_cast<void *>(image.data()), width, height);           // image out
     ocl->setValue(
-        3, (void *)&threshold, sizeof(unsigned char));                  // threshold
+        3, (void *)&threshold, sizeof(unsigned int));                   // threshold
 
     success = ocl->executeKernel(width, height, 16, 16);
-    cout << "EXPERIMENT WITH DIFFERENT WORK GROUP SIZES!" << endl;
 
     if (!success)
         return false;
@@ -732,7 +729,6 @@ bool Image::occlusionFill()
         1, static_cast<void *>(image.data()), width, height);
 
     success = ocl->executeKernel(width, height, 16, 16);
-    cout << "EXPERIMENT WITH DIFFERENT WORK GROUP SIZES!" << endl;
 
     if (!success)
         return false;

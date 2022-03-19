@@ -17,4 +17,4 @@ OUT = stereo.exe
 
 all: $(SRC)
 	$(CXX) $(CFLAGS) $(SRC) $(EXT_LIB) -I $(EXT_INC) -o $(OUT)
-	@echo Done. Run using: "stereo.exe LEFT_IMAGE RIGHT_IMAGE [WINDOW_SIZE=9] [MAX_SEARCH_DIST=32] [DOWNSCALE_FACTOR=4]"
+	@echo Done. Run using: "stereo.exe LEFT_IMAGE RIGHT_IMAGE [WINDOW_SIZE=9] [MAX_SEARCH_DIST=32] [CROSS_CHECK_THRESHOLD=8] [DOWNSCALE_FACTOR=4]"

@@ -87,7 +87,7 @@ public:
     //bool resize(size_t width, size_t height);
     bool downScale(unsigned int factor);
     bool calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSize, unsigned int maxSearchD, bool reverse = false);
-    bool crossCheck(Image &left, Image &right);
+    bool crossCheck(Image &left, Image &right, unsigned int threshold = 8);
     bool occlusionFill();
 
     // TEMP
