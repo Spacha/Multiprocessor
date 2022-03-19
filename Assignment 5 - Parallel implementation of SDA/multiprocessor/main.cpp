@@ -51,6 +51,9 @@ std::string computeDeviceStr()
         case TARGET_CPU:
             return "OpenCL (CPU)";
             break;
+        case TARGET_PTHREAD:
+            return "Pthread (CPU)";
+            break;
         default:
             return "CPU (no parallelization)";
             break;
@@ -106,6 +109,7 @@ int main(int argc, char *argv[])
     ocl.initialize(TARGET_DEVICE_TYPE);
     leftImg->setOpenCL(&ocl);
     rightImg->setOpenCL(&ocl);
+    finalImg.setOpenCL(&ocl);
 
     ocl.displayDeviceInfo();
 #endif /* USE_OCL */
@@ -165,6 +169,12 @@ int main(int argc, char *argv[])
     CHECK_ERROR(success, "Error calculating ZNCC for the right image.")
     ptimer.printTime();
 
+#ifdef USE_OCL
+    // print the actual kernel execution time
+    kernelTime = ocl.getExecutionTime();
+    printf("\t=> Kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
+#endif /* USE_OCL */
+
     // these have become unnecessary at this point
     delete leftImg;
     delete rightImg;
@@ -183,6 +193,12 @@ int main(int argc, char *argv[])
     CHECK_ERROR(success, "Error in cross checking.")
     ptimer.printTime();
 
+#ifdef USE_OCL
+    // print the actual kernel execution time
+    kernelTime = ocl.getExecutionTime();
+    printf("\t=> Kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
+#endif /* USE_OCL */
+
     // these have become unnecessary at this point
     delete leftDispImg;
     delete rightDispImg;
@@ -198,6 +214,12 @@ int main(int argc, char *argv[])
     success = finalImg.occlusionFill();
     CHECK_ERROR(success, "Error in occlusion filling.")
     ptimer.printTime();
+
+#ifdef USE_OCL
+    // print the actual kernel execution time
+    kernelTime = ocl.getExecutionTime();
+    printf("\t=> Kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
+#endif /* USE_OCL */
 
     ptimer.reset();
     success = finalImg.save("img/4-occlusion-filled.png");

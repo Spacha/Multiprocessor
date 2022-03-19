@@ -75,7 +75,7 @@ __kernel void filter(__read_only image2d_t in,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// CALCULATE ZNCC KERNEL
+// ZNCC (DISPARITY) KERNEL
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -103,10 +103,8 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
     // Calculate left window average.
     float windowSum = 0;
     float4 clr;
-    for (unsigned int y = pos.y - halfWindow; y < pos.y + halfWindow; y++)
-    {
-        for (unsigned int x = pos.x - halfWindow; x < pos.x + halfWindow; x++)
-        {
+    for (unsigned int y = pos.y - halfWindow; y < pos.y + halfWindow; y++) {
+        for (unsigned int x = pos.x - halfWindow; x < pos.x + halfWindow; x++) {
             clr = read_imagef( in_this, sampler, (int2)(x, y) );
             windowSum += clr[0];
         }
@@ -125,14 +123,11 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
     {
          // Calculate right window average.
         windowSum = 0;
-        for (unsigned int y = pos.y - halfWindow; y < pos.y + halfWindow; y++)
-        {
-            for (unsigned int x = pos.x + (dir * d) - halfWindow; x < pos.x + (dir * d) + halfWindow; x++)
-            {
+        for (unsigned int y = pos.y - halfWindow; y < pos.y + halfWindow; y++) {
+            for (unsigned int x = pos.x + (dir * d) - halfWindow; x < pos.x + (dir * d) + halfWindow; x++) {
                 clr = read_imagef( in_other, sampler, (int2)(x, y) );
                 windowSum += clr[0];
-            }
-        }
+            }}
         float rightAvg = (windowSum / (windowSize*windowSize));
 
         /* Calculate ZNCC */
@@ -142,16 +137,12 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
         float lowerRightSum = 0;
 
         /* Calculate ZNCC(x, y, d) */
-        for (int wy = -halfWindow; wy <= halfWindow; wy++)
-        {
-            for (int wx = -halfWindow; wx <= halfWindow; wx++)
-            {
+        for (int wy = -halfWindow; wy <= halfWindow; wy++) {
+            for (int wx = -halfWindow; wx <= halfWindow; wx++) {
                 // difference of (left/right) image pixel from the average
                 // TODO: Not necessary for each d!
-                //char leftDiff  = this->getGrayPixel(x + wx, y + wy) - leftAvg;
                 clr = read_imagef( in_this, sampler, (int2)(pos.x + wx, pos.y + wy) );
                 float leftDiff = clr[0] - leftAvg;
-                //char rightDiff = args->otherImg.getGrayPixel(x + wx + (args->dir * d), y + wy) - rightAvg;
                 clr = read_imagef( in_other, sampler, (int2)(pos.x + wx + (dir * d), pos.y + wy) );
                 float rightDiff = clr[0] - rightAvg;
 
@@ -181,4 +172,66 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
     //float4 clr2 = read_imagef( in_other, sampler, pos );
     //float4 clr = (float4)((clr1 + clr2) / 2);
     //write_imagef( out, pos, (float4)(leftAvg, leftAvg, leftAvg, 1.0f) );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// CROSS CHECK KERNEL
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * NOTE: Assumes grayscale image.
+ **/
+__kernel void cross_check(__read_only image2d_t in_left,
+                          __read_only image2d_t in_right,
+                          __write_only image2d_t out,
+                          unsigned char threshold)
+{
+    int2 pos = (int2)(get_global_id(0), get_global_id(1));
+
+    float4 leftPixel = read_imagef( in_left, sampler, pos );
+    float4 rightPixel = read_imagef( in_right, sampler, pos );
+
+    // If there is a sufficiently large difference between the images,
+    // replace the pixel with tranparent black pixel.
+    if (fabs(leftPixel[0] - rightPixel[0]) > (float)(threshold / 255.0f))
+    {
+        write_imagef( out, pos, (float4)(0.0f, 0.0f, 0.0f, 0.0f) );
+    } else {
+        write_imagef( out, pos, leftPixel );
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// OCCLUSION FILL KERNEL
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * NOTE: Assumes grayscale image.
+ **/
+__kernel void occlusion_fill(__read_only image2d_t in,
+                             __write_only image2d_t out)
+{
+    int2 pos = (int2)(get_global_id(0), get_global_id(1));
+
+    float4 clr = read_imagef( in, sampler, pos );
+
+    // just copy the pixel...
+    if (clr[0] > 0)
+    {
+        write_imagef( out, pos, clr );
+        return;
+    }
+
+    for (int x0 = pos.x; x0 >= 0; x0--)
+    {
+        //unsigned char p0 = this->getGrayPixel(x0, y);
+        float4 clr0 = read_imagef( in, sampler, (int2)(x0, pos.y) );
+
+        if (clr0[0] > 0)
+        {
+            // replace current pixel (that is zero) with clr0
+            write_imagef( out, pos, clr0 );
+            break;
+        }
+    }
 }

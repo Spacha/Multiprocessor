@@ -18,7 +18,7 @@
 
 /** 
  * COMPUTE_DEVICE options:
- * TARGET_NONE     = Sequential - don't use OpenCL
+ * TARGET_NONE     = Sequential - no parallelization
  * TARGET_GPU      = OpenCL on GPU
  * TARGET_CPU      = OpenCL on CPU
  * TARGET_PTHREAD  = Threaded on CPU

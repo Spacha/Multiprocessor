@@ -164,7 +164,7 @@ bool Image::convertToGrayscale()
 
 #ifdef USE_OCL /* OpenCL (GPU or CPU) */
 
-    if (!this->ocl) {
+    if (!ocl) {
         cout << "Cannot do parallel execution without instance of MiniOCL." << endl;
         return false;
     }
@@ -178,7 +178,7 @@ bool Image::convertToGrayscale()
     ocl->setOutputImageBuffer(
         1, static_cast<void *>(image.data()), width, height);   // image out
 
-    success = this->ocl->executeKernel(width, height, 16, 16);
+    success = ocl->executeKernel(width, height, 16, 16);
 
 #else /* No parallelization */
 
@@ -217,12 +217,12 @@ bool Image::filter(const Filter &filter)
 
 #ifdef USE_OCL /* OpenCL (GPU or CPU) */
 
-    if (!this->ocl) {
+    if (!ocl) {
         cout << "Cannot do parallel execution without instance of MiniOCL." << endl;
         return false;
     }
 
-    success = this->ocl->buildKernel("filter");
+    success = ocl->buildKernel("filter");
 
     ocl->setInputImageBuffer(
         0, static_cast<void *>(image.data()), width, height);               // image in
@@ -401,12 +401,12 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
 
     bool success;
 
-    if (!this->ocl) {
+    if (!ocl) {
         cout << "Cannot do parallel execution without instance of MiniOCL." << endl;
         return false;
     }
 
-    success = this->ocl->buildKernel("calc_zncc");
+    success = ocl->buildKernel("calc_zncc");
 
     ocl->setInputImageBuffer(
         0, static_cast<void *>(image.data()), width, height);               // this image in
@@ -422,7 +422,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
         5, (void *)&args->maxSearchD, sizeof(unsigned int));                // max search distance
 
     success = ocl->executeKernel(width, height, 16, 16);
-    cout << "DO WE NEED TO HAVE LARGER LOCAL SIZE FOR LARGER WINDOW SIZES??" << endl;
+    cout << "EXPERIMENT WITH DIFFERENT WORK GROUP SIZES!" << endl;
 
     if (!success)
         return false;
@@ -456,7 +456,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
             cout << "Error! Unable to create thread: " << err << endl;
             break;
         }
-        cout << "Thread " << i << " created." << endl;
+        cout << "\tThread " << i << " created." << endl;
 
         fromY = toY + 1;
         toY = fromY + rowsPerThread - 1;
@@ -470,7 +470,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
     for(int i = 0; i < NUM_THREADS; i++)
     {
         pthread_join(threads[i], NULL);
-        cout << "Thread " << i << " done." << endl;
+        cout << "\tThread " << i << " done." << endl;
         delete args[i];
     }
 
@@ -615,11 +615,6 @@ void *calculateZNCC_thread_proxy(void *args)
 bool Image::crossCheck(Image &left, Image &right)
 {
     /*
-    The LEFT disparity map is obtained by mapping the image on the left against the one
-    on the right.
-    The RIGHT disparity map is obtained analogously by mapping the image on the right
-    against the one on the left.
-
     Cross checking is a process where you compare two depth maps.
 
     To obtain a consolidated map, the process consists in checking that the corresponding
@@ -631,12 +626,12 @@ bool Image::crossCheck(Image &left, Image &right)
     This process helps in removing the probable lack of consistency between the depth maps
     due to occlusions, noise, or algorithmic limitation.
 
-    // If the absolute difference is larger than the threshold,
-    // then replace the pixel value with zero. Otherwise the pixel value remains unchanged.
+    If the absolute difference is larger than the threshold,
+    then replace the pixel value with zero. Otherwise the pixel value remains unchanged.
 
-    // Spacha: I assume that the "otherwise the pixel remains unchanged" means that we
-    // pick one from either left or right picture? We'll pick from the left image.
-    // What about averaging between the two images?
+    Spacha: I assume that the "otherwise the pixel remains unchanged" means that we
+    pick one from either left or right picture? We'll pick from the left image.
+    What about averaging between the two images?
     */
     bool success;
     cout << "Performing cross-check... ";
@@ -649,25 +644,51 @@ bool Image::crossCheck(Image &left, Image &right)
 
     unsigned char threshold = 8;
 
+#ifdef USE_OCL /* OpenCL (GPU or CPU) */
+
+    if (!ocl) {
+        cout << "Cannot do parallel execution without instance of MiniOCL." << endl;
+        return false;
+    }
+
+    success = ocl->buildKernel("cross_check");
+
+    ocl->setInputImageBuffer(
+        0, static_cast<void *>(left.image.data()), width, height);      // left image in
+    ocl->setInputImageBuffer(
+        1, static_cast<void *>(right.image.data()), width, height);     // right image in
+    ocl->setOutputImageBuffer(
+        2, static_cast<void *>(image.data()), width, height);           // image out
+    ocl->setValue(
+        3, (void *)&threshold, sizeof(unsigned char));                  // threshold
+
+    success = ocl->executeKernel(width, height, 16, 16);
+    cout << "EXPERIMENT WITH DIFFERENT WORK GROUP SIZES!" << endl;
+
+    if (!success)
+        return false;
+
+#else /* No parallelization */
+
     for (unsigned int y = 0; y < this->height; y++)
     {
         for (unsigned int x = 0; x < this->width; x++)
         {
             unsigned char leftPixel = left.getGrayPixel(x, y);
 
+            // If there is a sufficiently large difference between the images,
+            // replace the pixel with tranparent black pixel.
             if (std::abs(leftPixel - right.getGrayPixel(x, y)) > threshold)
             {
                 this->putPixel(x, y, (unsigned char)0);
-            }
-            else
-            {
+            } else {
                 this->putPixel(x, y, leftPixel);
             }
         }
     }
 
-    // Do some magic, will ya?
     success = true;
+#endif
 
     cout << "Done." << endl;
     return success;
@@ -691,25 +712,32 @@ bool Image::occlusionFill()
     Some ideas:
         - take the pixel from left (or right if on the left edge)
         - take the average of the surrounding pixels (interpolate)...
-
-    FOR x in this->image:
-        FOR y in this->image:
-            if !this->getPixel(x, y).isZero():  // not zero, next pixel
-                continue
-
-            // filling is needed
-            Pixel newPixel(0, 0, 0, 0);
-
-            // note: this can well be empty as well, need
-            // to specifically look for non-zero pixel!
-            if (x > 0)
-                this->putPixel(x, y, this->getPixel(x - 1, y));
-            else                         // on the left edge
-                this->putPixel(x, y, this->getPixel(x + 1, y));
-
     */
     bool success;
     cout << "Performing occlusion fill... ";
+
+#ifdef USE_OCL /* OpenCL (GPU or CPU) */
+
+    if (!ocl) {
+        cout << "Cannot do parallel execution without instance of MiniOCL." << endl;
+        return false;
+    }
+
+    success = ocl->buildKernel("occlusion_fill");
+
+    // the same image is used as input and output
+    ocl->setInputImageBuffer(
+        0, static_cast<void *>(image.data()), width, height);
+    ocl->setOutputImageBuffer(
+        1, static_cast<void *>(image.data()), width, height);
+
+    success = ocl->executeKernel(width, height, 16, 16);
+    cout << "EXPERIMENT WITH DIFFERENT WORK GROUP SIZES!" << endl;
+
+    if (!success)
+        return false;
+
+#else /* No parallelization */
 
     for (unsigned int y = 0; y < this->height; y++)
     {
@@ -734,6 +762,7 @@ bool Image::occlusionFill()
     }
 
     success = true;
+#endif
 
     cout << "Done." << endl;
     return success;
