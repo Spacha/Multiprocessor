@@ -80,6 +80,8 @@ __kernel void filter(__read_only image2d_t in,
 
 /**
  * NOTE: Assumes grayscale image.
+ * Calculates ZNCC disparity between @in_this and @in_other according to
+ * @windowSize, @dir and @maxSearchD parameters. The result is written to @out.
  **/
 __kernel void calc_zncc(__read_only image2d_t in_this,
                         __read_only image2d_t in_other,
@@ -206,10 +208,13 @@ __kernel void cross_check(__read_only image2d_t in_left,
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- * NOTE: Assumes grayscale image.
+ * Performs a very simple occlusion fill. For each pixel, the nearest non-zero
+ * pixel on the left is used. If none is found, write a black opaque pixel.
+ * + very fast
+ * - the resulting fill has 'tears' on some edges
  **/
-__kernel void occlusion_fill(__read_only image2d_t in,
-                             __write_only image2d_t out)
+__kernel void occlusion_fill_left(__read_only image2d_t in,
+                                  __write_only image2d_t out)
 {
     int2 pos = (int2)(get_global_id(0), get_global_id(1));
 
@@ -231,7 +236,67 @@ __kernel void occlusion_fill(__read_only image2d_t in,
         {
             // replace current pixel (that is zero) with clr0
             write_imagef( out, pos, clr0 );
-            break;
+            return;
         }
     }
+
+    // if no pixels found on the left, replace with black pixel
+    write_imagef( out, pos, (float4)(0.0f, 0.0f, 0.0f, 1.0f) );
+}
+
+/**
+ * Performs more complicated occlusion fill. For each pixel, the nearest non-zero
+ * pixel is searched using a spiral-like search. If none is found (impossible),
+ * write a black opaque pixel.
+ * + more accurate fill
+ * - more complex -> slightly slower
+ */
+__kernel void occlusion_fill_nearest(__read_only image2d_t in,
+                                     __write_only image2d_t out)
+{
+    int2 pos = (int2)(get_global_id(0), get_global_id(1));
+    float w = get_image_width(in);
+    float h = get_image_height(in);
+
+    float4 clr = read_imagef( in, sampler, pos );
+
+    // just copy the pixel...
+    if (clr[0] > 0)
+    {
+        write_imagef( out, pos, clr );
+        return;
+    }
+
+    // Spirals out in X and Y, checking each pixel for the nearest non-zero pixel.
+
+    //for (int x0 = pos.x; x0 >= 0; x0--)
+    for (int i = 1; i < w; i++)
+    {
+        for (char dirX = -1; dirX <= 1; dirX++)
+        {
+            int x0 = pos.x + dirX * i;
+            if (x0 < 0 || x0 > (w - 1))
+                    continue;
+
+            for (char dirY = -1; dirY <= 1; dirY++)
+            {
+                int y0 = pos.y + dirY * i;
+                if (y0 < 0 || y0 > (h - 1))
+                    continue;
+
+                //unsigned char p0 = this->getGrayPixel(x0, y);
+                float4 clr0 = read_imagef( in, sampler, (int2)(x0, y0) );
+
+                if (clr0[0] > 0)
+                {
+                    // replace current pixel (that is zero) with clr0
+                    write_imagef( out, pos, clr0 );
+                    return;
+                }
+            }
+        }
+    }
+
+    // if no pixels found on the left, replace with black pixel
+    write_imagef( out, pos, (float4)(0.0f, 0.0f, 0.0f, 1.0f) );
 }

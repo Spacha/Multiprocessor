@@ -543,8 +543,6 @@ void *Image::calculateZNCC_thread(ZNCCArgs *args)
                 unsigned int lowerLeftSum = 0;
                 unsigned int lowerRightSum = 0;
 
-                //cout << "getting (" << x << ", " << y << ")";
-                // getting(48, 64)
                 /* Calculate ZNCC(x, y, d) */
                 for (int wy = -halfWindow; wy <= halfWindow; wy++) // 20
                 {
@@ -552,15 +550,14 @@ void *Image::calculateZNCC_thread(ZNCCArgs *args)
                     {
                         // difference of (left/right) image pixel from the average
                         // TODO: Not necessary for each d!
-                        char leftDiff  = this->getGrayPixel(x + wx, y + wy) - leftAvg;
-                        char rightDiff = args->otherImg.getGrayPixel(x + wx + (args->dir * d), y + wy) - rightAvg;
+                        int leftDiff  = this->getGrayPixel(x + wx, y + wy) - leftAvg;
+                        int rightDiff = args->otherImg.getGrayPixel(x + wx + (args->dir * d), y + wy) - rightAvg;
 
                         upperSum      += leftDiff * rightDiff;
                         lowerLeftSum  += leftDiff * leftDiff;     // leftDiff ^ 2
                         lowerRightSum += rightDiff * rightDiff;   // rightDiff ^ 2
                     }
                 }
-                //cout << " done" << endl;
 
                 // Finally calculate the ZNCC value
                 float correlation = (float)(upperSum / (sqrt(lowerLeftSum) * sqrt(lowerRightSum)));
@@ -720,7 +717,8 @@ bool Image::occlusionFill()
         return false;
     }
 
-    success = ocl->buildKernel("occlusion_fill");
+    // Options: occlusion_fill_left, occlusion_fill_nearest
+    success = ocl->buildKernel("occlusion_fill_nearest");
 
     // the same image is used as input and output
     ocl->setInputImageBuffer(
