@@ -1,0 +1,1 @@
+stereo.exe img/im0.png img/im1.png 15 55

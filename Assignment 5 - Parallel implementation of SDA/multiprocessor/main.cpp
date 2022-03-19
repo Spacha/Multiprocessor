@@ -58,6 +58,17 @@ std::string computeDeviceStr()
 
 int main(int argc, char *argv[])
 {
+    /*
+    As a small note, the disparity map should be scaled to the range of 0-255
+    based on the minimum and maximum values in the image.
+    Also: using single channel image in calculations would be more efficient,
+    CPU-wise, but especially memory-wise.
+
+    TODO:
+        (1) SCALING THE MAP TO 0-255
+        (2) ONLY COMPILE KERNEL ONCE
+        (3) NO UNNECESSARY TRANSFERS TO DEVICE
+    */
     bool success;
     PerfTimer ptimer;
     std::string leftImgName;

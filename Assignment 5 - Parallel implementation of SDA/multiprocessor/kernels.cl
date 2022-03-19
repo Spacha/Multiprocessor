@@ -246,8 +246,8 @@ __kernel void occlusion_fill_left(__read_only image2d_t in,
 
 /**
  * Performs more complicated occlusion fill. For each pixel, the nearest non-zero
- * pixel is searched using a spiral-like search. If none is found (impossible),
- * write a black opaque pixel.
+ * pixel is searched using a spiral-like search (square). If none is found
+ * (impossible), write a black opaque pixel.
  * + more accurate fill
  * - more complex -> slightly slower
  */

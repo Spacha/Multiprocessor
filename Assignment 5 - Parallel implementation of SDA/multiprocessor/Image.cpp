@@ -455,7 +455,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
             cout << "Error! Unable to create thread: " << err << endl;
             break;
         }
-        cout << "\tThread " << i << " created." << endl;
+        //cout << "\tThread " << i << " created." << endl;
 
         fromY = toY + 1;
         toY = fromY + rowsPerThread - 1;
@@ -469,7 +469,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
     for(int i = 0; i < NUM_THREADS; i++)
     {
         pthread_join(threads[i], NULL);
-        cout << "\tThread " << i << " done." << endl;
+        //cout << "\tThread " << i << " done." << endl;
         delete args[i];
     }
 

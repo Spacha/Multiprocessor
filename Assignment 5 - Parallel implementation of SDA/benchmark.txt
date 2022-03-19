@@ -1,6 +1,6 @@
 window size: 				15
-maximum seach distance: 	55
-cross-checking trheshold: 	8
+maximum search distance: 	55
+cross-checking threshold: 	8
 downscaling factor: 		5
 
 Task             Sequential CPU    Pthread CPU    OpenCL GPU
@@ -45,3 +45,8 @@ This implementation had:
 	2*2 + 2*2 + 1 + 1 = 10 downloads (optimal would be 2)
 
 According to this data, the transfer time is 90 ms on average (per image).
+
+
+Occlusion fill algorithms:
+	left:   0.200 ms
+	spiral: 0.266 ms
