@@ -12,7 +12,7 @@ using std::endl;
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- * If @success is false, orints out an error message and returns.
+ * If @success is false, prints out an error message and returns.
  **/
 #define CHECK_ERROR(success, msg)                           \
     if (!success) {                                         \
@@ -45,6 +45,9 @@ std::string computeDeviceStr()
             break;
         case TARGET_PTHREAD:
             return "Pthread (CPU)";
+            break;
+        case TARGET_OMP:
+            return "OpenMP (CPU)";
             break;
         default:
             return "CPU (no parallelization)";

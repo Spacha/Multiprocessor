@@ -26,8 +26,9 @@
  * TARGET_GPU      = OpenCL on GPU
  * TARGET_CPU      = OpenCL on CPU
  * TARGET_PTHREAD  = Threaded on CPU
+ * TARGET_OMP      = Threaded on CPU using OpenMP
  */
-#define COMPUTE_DEVICE TARGET_OMP
+#define COMPUTE_DEVICE TARGET_NONE
 
 /**
  * Number of parallel threads. Used only COMPUTE_DEVICE == TARGET_PTHREAD.

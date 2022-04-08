@@ -17,5 +17,5 @@ OUT = stereo.exe
 
 # NOTE: DONT'T ALWAYS INCLUDE EVERYTHING FOR FUN?
 all: $(SRC)
-	$(CXX) $(CFLAGS) $(SRC) $(EXT_LIB) -I $(EXT_INC) -o $(OUT) -fopenmp
+	$(CXX) $(CFLAGS) $(SRC) $(EXT_LIB) -I $(EXT_INC) -o $(OUT) -fopenmp -O3
 	@echo Done. Run using: "stereo.exe LEFT_IMAGE RIGHT_IMAGE [WINDOW_SIZE=9] [MAX_SEARCH_DIST=32] [CROSS_CHECK_THRESHOLD=8] [DOWNSCALE_FACTOR=4]"

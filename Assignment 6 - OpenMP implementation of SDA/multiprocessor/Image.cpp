@@ -182,14 +182,17 @@ bool Image::convertToGrayscale()
 
 #else /* No parallelization */
 
-    for (unsigned int y = 0; y < this->height; y++)
+    #ifdef USE_OMP
+    # pragma omp parallel for
+    #endif
+    for (int y = 0; y < (int)this->height; y++)
     {
-        for (unsigned int x = 0; x < this->width; x++)
+        for (int x = 0; x < (int)this->width; x++)
         {
             Pixel p = this->getPixel(x, y);
 
             // replace the pixel with a gray one
-            this->putPixel(x, y, ceil(0.299*p.red + 0.587*p.green + 0.114*p.blue));
+            this->putPixel(x, y, unsigned(ceil(0.299*p.red + 0.587*p.green + 0.114*p.blue)));
         }
     }
 
@@ -243,14 +246,14 @@ bool Image::filter(const Filter &filter)
     Image tempImage;
     tempImage.createEmpty(width, height);
 
-    int d = filter.size / 2; // kernel's "edge thickness"
+    int d = static_cast<int>(filter.size) / 2; // kernel's "edge thickness"
 
     #ifdef USE_OMP
     # pragma omp parallel for
     #endif
-    for (unsigned int cy = 0; cy < height; cy++)
+    for (int cy = 0; cy < (int)height; cy++)
     {
-        for (unsigned int cx = 0; cx < width; cx++)
+        for (int cx = 0; cx < (int)width; cx++)
         {
             unsigned int weight = 0;
             // we need more space per pixel since we first accumulate and then divide
@@ -266,10 +269,10 @@ bool Image::filter(const Filter &filter)
                         ? this->getPixel(x, y)
                         : Pixel(0, 0, 0, 0);
 
-                    newRed   += filter.mask[weight] * p.red;
-                    newGreen += filter.mask[weight] * p.green;
-                    newBlue  += filter.mask[weight] * p.blue;
-                    newAlpha  += filter.mask[weight] * p.alpha;
+                    newRed   += unsigned(filter.mask[weight]) * p.red;
+                    newGreen += unsigned(filter.mask[weight]) * p.green;
+                    newBlue  += unsigned(filter.mask[weight]) * p.blue;
+                    newAlpha  += unsigned(filter.mask[weight]) * p.alpha;
                     weight++;
                 }
             }
@@ -350,11 +353,11 @@ bool Image::downScale(unsigned int factor)
         #ifdef USE_OMP
         # pragma omp parallel for
         #endif
-        for (unsigned int y = 0; y < this->height; y++)
+        for (int y = 0; y < (int)this->height; y++)
         {
             if (y % factor == 0) continue; // skip every factor'th row
 
-            for (unsigned int x = 0; x < this->width; x++)
+            for (int x = 0; x < (int)this->width; x++)
             {
                 if (x % factor == 0) continue; // skip every factor'th column
 
@@ -474,7 +477,7 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
     }
 
     // Wait for threads to finish; after finish, delete its argument struct.
-    for(int i = 0; i < NUM_THREADS; i++)
+    for (int i = 0; i < NUM_THREADS; i++)
     {
         pthread_join(threads[i], NULL);
         //cout << "\tThread " << i << " done." << endl;
@@ -515,15 +518,16 @@ void *Image::calculateZNCC_thread(ZNCCArgs *args)
 #ifndef USE_THREADS
     float progress = 0.0f;
     float progressPerRound = 1.0f / this->height;
+
     #ifdef USE_OMP
     # pragma omp parallel for
     #endif
 #endif /* !USE_THREADS */
 
-    for (unsigned int y = args->fromY; y <= args->toY; y++)
+    for (int y = args->fromY; y <= (int)args->toY; y++)
     {
         //cout << "Thread: " << args->tid << ", y = " << y << endl;
-        for (unsigned int x = halfWindow; x < (this->width - halfWindow); x++)
+        for (int x = halfWindow; x < (int)(this->width - halfWindow); x++)
         {
             unsigned int leftAvg = this->grayAverage(
                 x - halfWindow,
@@ -620,7 +624,7 @@ void *calculateZNCC_thread_proxy(void *args)
  * @param threshold  The difference threshold. Default is 8.
  * @return           True on success, false on fail.
  */
-bool Image::crossCheck(Image &left, Image &right, unsigned int threshold /* = 8 */)
+bool Image::crossCheck(Image &left, Image &right, int threshold /* = 8 */)
 {
     /*
     Cross checking is a process where you compare two depth maps.
@@ -675,9 +679,12 @@ bool Image::crossCheck(Image &left, Image &right, unsigned int threshold /* = 8 
 
 #else /* No parallelization */
 
-    for (unsigned int y = 0; y < this->height; y++)
+    #ifdef USE_OMP
+    # pragma omp parallel for
+    #endif
+    for (int y = 0; y < (int)this->height; y++)
     {
-        for (unsigned int x = 0; x < this->width; x++)
+        for (int x = 0; x < (int)this->width; x++)
         {
             unsigned char leftPixel = left.getGrayPixel(x, y);
 
@@ -744,9 +751,12 @@ bool Image::occlusionFill()
 
 #else /* No parallelization */
 
-    for (unsigned int y = 0; y < this->height; y++)
+    #ifdef USE_OMP
+    # pragma omp parallel for
+    #endif
+    for (int y = 0; y < (int)this->height; y++)
     {
-        for (unsigned int x = 0; x < this->width; x++)
+        for (int x = 0; x < (int)this->width; x++)
         {
             unsigned char p = this->getGrayPixel(x, y);
 
