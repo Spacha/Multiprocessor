@@ -28,7 +28,7 @@
  * TARGET_PTHREAD  = Threaded on CPU
  * TARGET_OMP      = Threaded on CPU using OpenMP
  */
-#define COMPUTE_DEVICE TARGET_NONE
+#define COMPUTE_DEVICE TARGET_OMP
 
 /**
  * Number of parallel threads. Used only COMPUTE_DEVICE == TARGET_PTHREAD.
