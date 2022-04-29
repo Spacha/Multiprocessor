@@ -9,7 +9,7 @@ using std::endl;
  * @param kernelFileName Name of the file that contains the kernel code.
  */
 MiniOCL::MiniOCL(const char* kernelFileName)
-    : kernelFileName(kernelFileName), device_type(), outImg(), platform(),
+    : kernelFileName(kernelFileName), device_type(), outImg(), outBuf(), platform(),
       device_id(), context(), queue(), program(), kernel(), kernelEvent()
 {
     // initialize the object...
@@ -137,11 +137,19 @@ bool MiniOCL::readOutput()
 {
     cl_int err = CL_SUCCESS;
 
-    err |= clEnqueueReadImage(queue,
-        outImg.buffer, CL_TRUE,
-        outImg.origin,
-        outImg.region, 0, 0,
-        outImg.data, 0, NULL, NULL);
+    if (outputIsImage)
+    {
+        err |= clEnqueueReadImage(queue,
+            outImg.buffer, CL_TRUE,
+            outImg.origin,
+            outImg.region, 0, 0,
+            outImg.data, 0, NULL, NULL);
+    } else {
+        err |= clEnqueueReadBuffer(queue,
+            outBuf.buffer, CL_TRUE, 0,
+            outBuf.size,
+            outBuf.data, 0, NULL, NULL);
+    }
 
     return err == CL_SUCCESS;
 }
@@ -188,8 +196,6 @@ bool MiniOCL::setInputBuffer(cl_uint argIndex, void *data, size_t size)
 /**
  * Sets an output buffer as a kernel argument.
  * 
- * @note           Not implemented.
- * 
  * @param argIndex Argument index.
  * @param data     Pointer to the buffer to be bound to the argument.
  * @param size     Buffer size in bytes.
@@ -199,9 +205,14 @@ bool MiniOCL::setOutputBuffer(cl_uint argIndex, void *data, size_t size)
 {
     cl_int err = CL_SUCCESS;
 
-    err = CL_INVALID_VALUE; // Not implemented!
+    outputIsImage = false;
 
-    // don't forget to use output_buffer_t
+    cl_mem_flags flags = CL_MEM_WRITE_ONLY;
+    outBuf.buffer = clCreateBuffer(context, flags, size, NULL, &err);
+    outBuf.size = size;
+    outBuf.data = data;
+
+    err |= clSetKernelArg(kernel, argIndex, sizeof(cl_mem), &outBuf.buffer);
 
     return err == CL_SUCCESS;
 }
@@ -209,15 +220,19 @@ bool MiniOCL::setOutputBuffer(cl_uint argIndex, void *data, size_t size)
 /**
  * Sets an input image buffer as a kernel argument.
  * 
- * @param argIndex Argument index.
- * @param data     Pointer to the image to be bound to the argument.
- * @param size     Image width.
- * @param size     Image height.
- * @return         True on success, false on fail.
+ * @param argIndex      Argument index.
+ * @param data          Pointer to the image to be bound to the argument.
+ * @param width         Image width.
+ * @param height        Image height.
+ * @param singleChannel Whether a single channel image is in use.
+ * @return              True on success, false on fail.
  */
-bool MiniOCL::setInputImageBuffer(cl_uint argIndex, void *data, size_t width, size_t height)
+bool MiniOCL::setInputImageBuffer(cl_uint argIndex, void* data, size_t width, size_t height, bool singleChannel)
 {
     cl_int err = CL_SUCCESS;
+
+    if (singleChannel)
+        return setInputBuffer(argIndex, data, width * height * sizeof(unsigned char));
 
     // Pixel format: RGBA, each pixel channel is unsigned 8-bit integer
     static const cl_image_format format = { CL_RGBA, CL_UNORM_INT8 };
@@ -238,15 +253,21 @@ bool MiniOCL::setInputImageBuffer(cl_uint argIndex, void *data, size_t width, si
 /**
  * Sets an output image buffer as a kernel argument.
  * 
- * @param argIndex Argument index.
- * @param data     Pointer to the image to be bound to the argument.
- * @param size     Image width.
- * @param size     Image height.
- * @return         True on success, false on fail.
+ * @param argIndex      Argument index.
+ * @param data          Pointer to the image to be bound to the argument.
+ * @param width         Image width.
+ * @param height        Image height.
+ * @param singleChannel Whether a single channel image is in use.
+ * @return              True on success, false on fail.
  */
-bool MiniOCL::setOutputImageBuffer(cl_uint argIndex, void *data, size_t width, size_t height)
+bool MiniOCL::setOutputImageBuffer(cl_uint argIndex, void *data, size_t width, size_t height, bool singleChannel)
 {
     cl_int err = CL_SUCCESS;
+
+    if (singleChannel)
+        return setOutputBuffer(argIndex, data, width * height * sizeof(unsigned char));
+
+    outputIsImage = true;
 
     // Pixel format: RGBA, each pixel channel is unsigned 8-bit integer
     static const cl_image_format format = { CL_RGBA, CL_UNORM_INT8 };

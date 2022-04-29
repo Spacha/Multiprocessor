@@ -14,12 +14,14 @@ __constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE |
  * stores the result to image @out.
  **/
 __kernel void grayscale(__read_only image2d_t in,
-                        __write_only image2d_t out)
+                        __global uchar *out)
+                        //__write_only image2d_t out)
 {
     int2 coord = (int2)(get_global_id(0), get_global_id(1));
     float4 clr = read_imagef(in, sampler, coord);
 
-    if (coord.x >= get_image_width(in) || coord.y >= get_image_height(in))
+    int w = get_image_width(in);
+    if (coord.x >= w || coord.y >= get_image_height(in))
     {
         return;
     }
@@ -27,7 +29,8 @@ __kernel void grayscale(__read_only image2d_t in,
     // NTCS gray conversion
     float gray = 0.299f*clr.x + 0.587f*clr.y + 0.114f*clr.z; // float4 : (xyzw)
 
-    write_imagef(out, coord, (float4)(gray, gray, gray, clr.w));
+    //write_imagef(out, coord, (float4)(gray, gray, gray, clr.w));
+    out[coord.y * w + coord.x] = (uchar)(gray * 255);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

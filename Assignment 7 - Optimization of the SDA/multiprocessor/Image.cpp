@@ -10,7 +10,7 @@ using std::endl;
 /**
  * Initializes the object.
  */
-Image::Image() : width(0), height(0)
+Image::Image() : singleChannel(false), width(0), height(0)
 {
     // ...
 }
@@ -35,8 +35,20 @@ void Image::setOpenCL(MiniOCL *ocl)
 }
 
 /**
+ * Set the channel count on the image to be a single channel (grays scale) or
+ * RGBA (4 channels).
+ * NOTE: Currently only single and 4 channel images are supported.
+ * 
+ * @param bool singleChannel Whether to make the image single channel or 4 channel.
+ */
+void Image::setSingleChannel(bool singleChannel)
+{
+    this->singleChannel = singleChannel;
+}
+
+/**
  * Creates an empty image of given image. Image will
- * contain only transparent balck pixels.
+ * contain only transparent black pixels.
  * 
  * @param width  Image width
  * @param height Image height
@@ -55,10 +67,11 @@ void Image::createEmpty(size_t width, size_t height)
  * The image sizes must match exactly.
  * 
  * @param newImage Image that will replace the current image.
+ * @param forceNew Clear the previous image.
  */
-void Image::replace(Image &newImage)
+void Image::replace(Image &newImage, bool forceNew /* = false */)
 {
-    if (newImage.width != this->width || newImage.height != this->height)
+    if (forceNew || newImage.width != this->width || newImage.height != this->height || newImage.singleChannel != this->singleChannel)
     {
         // new image is different size -> make a new image
         this->createEmpty(newImage.width, newImage.height);
@@ -126,7 +139,7 @@ bool Image::save(const std::string &filename)
 
     cout << "Encoding image... ";
     err = lodepng::encode(png, this->image,
-        (unsigned)this->width, (unsigned)this->height);
+        (unsigned)this->width, (unsigned)this->height, singleChannel ? LCT_GREY : LCT_RGBA);
     cout << "Done." << endl;
 
     if (err) {
@@ -162,6 +175,10 @@ bool Image::convertToGrayscale()
     bool success = true;
     cout << "Transforming image to grayscale... ";
 
+    Image *tempImage = new Image();
+    tempImage->setSingleChannel(true);
+    tempImage->createEmpty(width, height);
+
 #ifdef USE_OCL /* OpenCL (GPU or CPU) */
 
     if (!ocl) {
@@ -174,9 +191,9 @@ bool Image::convertToGrayscale()
     success = ocl->buildKernel("grayscale");
 
     ocl->setInputImageBuffer(
-        0, static_cast<void *>(image.data()), width, height);   // image in
+        0, static_cast<void *>(image.data()), width, height, false);            // image in
     ocl->setOutputImageBuffer(
-        1, static_cast<void *>(image.data()), width, height);   // image out
+        1, static_cast<void *>(tempImage->image.data()), width, height, true);  // image out
 
     success = ocl->executeKernel(width, height, 16, 16);
 
@@ -191,12 +208,16 @@ bool Image::convertToGrayscale()
         {
             Pixel p = this->getPixel(x, y);
 
-            // replace the pixel with a gray one
-            this->putPixel(x, y, unsigned(ceil(0.299*p.red + 0.587*p.green + 0.114*p.blue)));
+            // replace the pixel with a gray one (NTCS formula)
+            tempImage->putPixel(x, y, unsigned(ceil(0.299*p.red + 0.587*p.green + 0.114*p.blue)));
         }
     }
 
 #endif
+    // update the image
+    this->setSingleChannel(true);
+    this->replace(*tempImage, true);
+
     cout << "Done." << endl;
     return success;
 }
@@ -228,15 +249,15 @@ bool Image::filter(const Filter &filter)
     success = ocl->buildKernel("filter");
 
     ocl->setInputImageBuffer(
-        0, static_cast<void *>(image.data()), width, height);               // image in
+        0, static_cast<void *>(image.data()), width, height, singleChannel);    // image in
     ocl->setOutputImageBuffer(
-        1, static_cast<void *>(image.data()), width, height);               // image out
+        1, static_cast<void *>(image.data()), width, height, singleChannel);    // image out
     ocl->setInputBuffer(
-        2, (void *)filter.mask, filter.size * filter.size * sizeof(float)); // filter mask
+        2, (void *)filter.mask, filter.size * filter.size * sizeof(float));     // filter mask
     ocl->setValue(
-        3, (void *)&filter.size, sizeof(int));                              // filter size
+        3, (void *)&filter.size, sizeof(int));                                  // filter size
     ocl->setValue(
-        4, (void *)&filter.divisor, sizeof(float));                         // filter divisor
+        4, (void *)&filter.divisor, sizeof(float));                             // filter divisor
 
     success = ocl->executeKernel(width, height, 16, 16);
 
@@ -420,17 +441,17 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
     success = ocl->buildKernel("calc_zncc");
 
     ocl->setInputImageBuffer(
-        0, static_cast<void *>(image.data()), width, height);               // this image in
+        0, static_cast<void *>(image.data()), width, height, singleChannel);                // this image in
     ocl->setInputImageBuffer(
-        1, static_cast<void *>(otherImg.image.data()), width, height);      // other image in
+        1, static_cast<void *>(otherImg.image.data()), width, height, singleChannel);       // other image in
     ocl->setOutputImageBuffer(
-        2, static_cast<void *>(disparityMap->image.data()), width, height); // image out (disparity map)
+        2, static_cast<void *>(disparityMap->image.data()), width, height, singleChannel);  // image out (disparity map)
     ocl->setValue(
-        3, (void *)&args->windowSize, sizeof(const char));                  // window size
+        3, (void *)&args->windowSize, sizeof(const char));                                  // window size
     ocl->setValue(
-        4, (void *)&args->dir, sizeof(char));                               // direction
+        4, (void *)&args->dir, sizeof(char));                                               // direction
     ocl->setValue(
-        5, (void *)&args->maxSearchD, sizeof(unsigned int));                // max search distance
+        5, (void *)&args->maxSearchD, sizeof(unsigned int));                                // max search distance
 
     success = ocl->executeKernel(width, height, 16, 16);
 
@@ -664,13 +685,13 @@ bool Image::crossCheck(Image &left, Image &right, int threshold /* = 8 */)
     success = ocl->buildKernel("cross_check");
 
     ocl->setInputImageBuffer(
-        0, static_cast<void *>(left.image.data()), width, height);      // left image in
+        0, static_cast<void *>(left.image.data()), width, height, singleChannel);   // left image in
     ocl->setInputImageBuffer(
-        1, static_cast<void *>(right.image.data()), width, height);     // right image in
+        1, static_cast<void *>(right.image.data()), width, height, singleChannel);  // right image in
     ocl->setOutputImageBuffer(
-        2, static_cast<void *>(image.data()), width, height);           // image out
+        2, static_cast<void *>(image.data()), width, height, singleChannel);        // image out
     ocl->setValue(
-        3, (void *)&threshold, sizeof(unsigned int));                   // threshold
+        3, (void *)&threshold, sizeof(unsigned int));                               // threshold
 
     success = ocl->executeKernel(width, height, 16, 16);
 
@@ -740,9 +761,9 @@ bool Image::occlusionFill()
 
     // the same image is used as input and output
     ocl->setInputImageBuffer(
-        0, static_cast<void *>(image.data()), width, height);
+        0, static_cast<void *>(image.data()), width, height, singleChannel);
     ocl->setOutputImageBuffer(
-        1, static_cast<void *>(image.data()), width, height);
+        1, static_cast<void *>(image.data()), width, height, singleChannel);
 
     success = ocl->executeKernel(width, height, 16, 16);
 
@@ -796,6 +817,9 @@ void Image::putPixel(unsigned int x, unsigned int y, Pixel pixel)
     if (!validCoordinates(x, y))
         throw;
 
+    if (singleChannel)
+        throw;  // FIXME: Should not use this for single channel images!
+
     // unsigned int i = 4*(y*width + x);
     const __int64 i = 4 * (y * width + x);
 
@@ -810,8 +834,20 @@ void Image::putPixel(unsigned int x, unsigned int y, Pixel pixel)
  **/
 void Image::putPixel(unsigned int x, unsigned int y, unsigned char grey)
 {
-    Pixel pixel(grey, grey, grey, 0xff);
-    this->putPixel(x, y, pixel);
+    if (singleChannel)
+    {
+        // this part is just copied from the another putPixel method
+        if (!validCoordinates(x, y))
+            throw;
+
+        // unsigned int i = 4*(y*width + x);
+        const __int64 i = y * width + x;
+
+        this->image[i] = grey;
+    } else {
+        Pixel pixel(grey, grey, grey, 0xff);
+        this->putPixel(x, y, pixel);
+    }
 }
 
 /**
@@ -822,6 +858,9 @@ Pixel Image::getPixel(unsigned int x, unsigned int y)
 {
     if (!validCoordinates(x, y))
         throw;
+
+    if (singleChannel)
+        throw;  // FIXME: Should not use this for single channel images!
 
     // RGBA
     // unsigned int i = 4*(y*width + x);
@@ -892,8 +931,9 @@ unsigned char Image::grayAverage(unsigned int startX, unsigned int startY, size_
  */
 size_t Image::sizeBytes()
 {
-    // TODO: Can we guarantee always having 4 channels?
-    return 4 * sizeof(unsigned char) * this->width * this->height;
+    unsigned char channels = singleChannel ? 1 : 4;
+
+    return channels * sizeof(unsigned char) * this->width * this->height;
 }
 
 
@@ -938,15 +978,15 @@ bool Image::calcStereoDisparity(Image &otherImg, Image *disparityMap, unsigned i
     success = ocl->buildKernel("calc_stereo_disparity");
 
     ocl->setInputImageBuffer(
-        0, static_cast<void *>(image.data()), width, height);                   // this image in
+        0, static_cast<void *>(image.data()), width, height, singleChannel);                // this image in
     ocl->setInputImageBuffer(
-        1, static_cast<void *>(otherImg.image.data()), width, height);          // other image in
+        1, static_cast<void *>(otherImg.image.data()), width, height, singleChannel);       // other image in
     ocl->setOutputImageBuffer(
-        2, static_cast<void *>(disparityMap->image.data()), width, height);     // image out (disparity map)
+        2, static_cast<void *>(disparityMap->image.data()), width, height, singleChannel);  // image out (disparity map)
     ocl->setValue(
-        3, (void *)&windowSize, sizeof(const char));                            // window size
+        3, (void *)&windowSize, sizeof(const char));                                        // window size
     ocl->setValue(
-        4, (void *)&maxSearchD, sizeof(unsigned int));                          // max search distance
+        4, (void *)&maxSearchD, sizeof(unsigned int));                                      // max search distance
 
     success = ocl->executeKernel(width, height, 16, 16);
 

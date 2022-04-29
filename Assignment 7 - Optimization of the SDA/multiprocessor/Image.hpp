@@ -6,7 +6,9 @@
 #include "Application.hpp"
 #include "Filters.hpp"
 #include "MiniOCL.hpp"
+#pragma warning(push, 0)  // prevent warnings from the lodepng header
 #include "lodepng.h"
+#pragma warning(pop)
 
 #ifdef USE_THREADS
 # define HAVE_STRUCT_TIMESPEC /* Required in VC++, I guess... */
@@ -66,8 +68,9 @@ typedef struct Pixel Pixel;
 class Image
 {
 public:
-    std::vector<unsigned char> image;   // image pixels (RGBA)
+    std::vector<unsigned char> image;   // image pixels (RGBA / grey)
     std::string name;                   // image file name
+    bool singleChannel;                 // whether the image is stored and handled as single-channel (grayscale)
     size_t width;                       // image width
     size_t height;                      // image height
     MiniOCL *ocl = nullptr;             // Handle to OpenCL wrapper class for parallel execution
@@ -75,10 +78,11 @@ public:
     Image();
     ~Image();
     void setOpenCL(MiniOCL *ocl);
+    void setSingleChannel(bool singleChannel);
 
     // image creation etc.
     void createEmpty(size_t width, size_t height);
-    void replace(Image &newImage);
+    void replace(Image &newImage, bool forceNew = false);
     bool load(const std::string &filename);
     bool save(const std::string &filename);
 
