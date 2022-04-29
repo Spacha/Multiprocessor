@@ -110,9 +110,12 @@ bool Image::load(const std::string &filename)
     }
 
     cout << "Decoding image... ";
-    err = lodepng::decode(this->image,
-        (unsigned &)this->width, (unsigned &)this->height, png);
+    unsigned w, h;
+    err = lodepng::decode(this->image, w, h, png);
     cout << "Done." << endl;
+
+    this->width = w;
+    this->height= h;
 
 
     // the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA...

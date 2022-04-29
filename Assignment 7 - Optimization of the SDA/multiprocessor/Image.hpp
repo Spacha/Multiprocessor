@@ -6,9 +6,7 @@
 #include "Application.hpp"
 #include "Filters.hpp"
 #include "MiniOCL.hpp"
-#pragma warning(push, 0)  // prevent warnings from the lodepng header
 #include "lodepng.h"
-#pragma warning(pop)
 
 #ifdef USE_THREADS
 # define HAVE_STRUCT_TIMESPEC /* Required in VC++, I guess... */
