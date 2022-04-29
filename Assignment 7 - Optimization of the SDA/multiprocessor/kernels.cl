@@ -86,16 +86,17 @@ __kernel void filter(__read_only image2d_t in,
  * Calculates ZNCC disparity between @in_this and @in_other according to
  * @windowSize, @dir and @maxSearchD parameters. The result is written to @out.
  **/
-__kernel void calc_zncc(__read_only image2d_t in_this,
-                        __read_only image2d_t in_other,
-                        __write_only image2d_t out,
+__kernel void calc_zncc(__global uchar *in_this,
+                        __global uchar *in_other,
+                        __global uchar *out,
+                        int w, int h,
                         char windowSize,
                         char dir,
                         unsigned int maxSearchD)
 {
     int2 pos = (int2)(get_global_id(0), get_global_id(1));
-    float w = get_image_width(in_this);
-    float h = get_image_height(in_this);
+    //int w = get_global_size(0); //float w = get_image_width(in_this);
+    //int h = get_global_size(1); //float h = get_image_height(in_this);
     const char halfWindow = (windowSize - 1) / 2;
 
     // skip the edges
@@ -107,16 +108,15 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
 
     // Calculate left window average.
     float windowSum = 0;
-    float4 clr;
+    float clr;
     for (unsigned int y = pos.y - halfWindow; y < pos.y + halfWindow; y++) {
         for (unsigned int x = pos.x - halfWindow; x < pos.x + halfWindow; x++) {
-            clr = read_imagef( in_this, sampler, (int2)(x, y) );
-            windowSum += clr[0];
+            windowSum += in_other[y * w + x] / 255.0f; //clr = read_imagef( in_this, sampler, (int2)(x, y) );
         }
     }
-    float leftAvg = (windowSum / (windowSize*windowSize));
+    float leftAvg = (windowSum / (windowSize * windowSize));
 
-    unsigned char bestD = 0;        // tracks the distance with best correlation
+    uchar bestD = 0;                // tracks the distance with best correlation
     float maxCorrelation = 0.0f;    // tracks the best correlation (ZNCC)
 
     // stops at the left/right edge (OpenCL defines generic integer min and max)
@@ -126,14 +126,15 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
 
     for (int d = 0; d <= maxD; d++)
     {
-         // Calculate right window average.
+        // Calculate right window average.
         windowSum = 0;
         for (unsigned int y = pos.y - halfWindow; y < pos.y + halfWindow; y++) {
             for (unsigned int x = pos.x + (dir * d) - halfWindow; x < pos.x + (dir * d) + halfWindow; x++) {
-                clr = read_imagef( in_other, sampler, (int2)(x, y) );
-                windowSum += clr[0];
-            }}
-        float rightAvg = (windowSum / (windowSize*windowSize));
+                windowSum += in_other[y * w + x] / 255.0f; //clr = read_imagef( in_other, sampler, (int2)(x, y) );
+            }
+        }
+
+        float rightAvg = (windowSum / (windowSize * windowSize));
 
         /* Calculate ZNCC */
 
@@ -146,10 +147,10 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
             for (int wx = -halfWindow; wx <= halfWindow; wx++) {
                 // difference of (left/right) image pixel from the average
                 // TODO: Not necessary for each d!
-                clr = read_imagef( in_this, sampler, (int2)(pos.x + wx, pos.y + wy) );
-                float leftDiff = clr[0] - leftAvg;
-                clr = read_imagef( in_other, sampler, (int2)(pos.x + wx + (dir * d), pos.y + wy) );
-                float rightDiff = clr[0] - rightAvg;
+                clr = in_this[(pos.y + wy) * w + (pos.x + wx)] / 255.0f; //clr = read_imagef( in_this, sampler, (int2)(pos.x + wx, pos.y + wy) );
+                float leftDiff = clr - leftAvg;
+                clr = in_other[(pos.y + wy) * w + (pos.x + wx + (dir * d))] / 255.0f; //clr = read_imagef( in_other, sampler, (int2)(pos.x + wx + (dir * d), pos.y + wy) );
+                float rightDiff = clr - rightAvg;
 
                 upperSum      += leftDiff * rightDiff;
                 lowerLeftSum  += leftDiff * leftDiff;     // leftDiff ^ 2
@@ -169,9 +170,10 @@ __kernel void calc_zncc(__read_only image2d_t in_this,
 
         // put the best disparity value to the disparity map
         //args->disparityMap->putPixel(x, y, bestD);
-        float p = bestD / 255.0f;
-        write_imagef( out, pos, (float4)(p, p, p, 1.0f) );
+        //float p = bestD / 255.0f;
     }
+
+    out[pos.y * w + pos.x] = bestD; //write_imagef( out, pos, (float4)(p, p, p, 1.0f) );
 
     //float4 clr1 = read_imagef( in_this, sampler, pos );
     //float4 clr2 = read_imagef( in_other, sampler, pos );

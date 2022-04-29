@@ -10,7 +10,7 @@ using std::endl;
 /**
  * Initializes the object.
  */
-Image::Image() : singleChannel(false), width(0), height(0)
+Image::Image(bool singleChannel /* = false */) : singleChannel(singleChannel), width(0), height(0)
 {
     // ...
 }
@@ -21,6 +21,22 @@ Image::Image() : singleChannel(false), width(0), height(0)
 Image::~Image()
 {
     // ...
+}
+
+/**
+ * Initializes the (grayscale) object.
+ */
+GrayImage::GrayImage() : Image(true)
+{
+    // ..
+}
+
+/**
+ * Destructs the (grayscale) object and cleans up after itself.
+ */
+GrayImage::~GrayImage()
+{
+    // ..
 }
 
 /**
@@ -450,11 +466,15 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
     ocl->setOutputImageBuffer(
         2, static_cast<void *>(disparityMap->image.data()), width, height, singleChannel);  // image out (disparity map)
     ocl->setValue(
-        3, (void *)&args->windowSize, sizeof(const char));                                  // window size
+        3, (void*)&otherImg.width, sizeof(int));                                            // image width
     ocl->setValue(
-        4, (void *)&args->dir, sizeof(char));                                               // direction
+        4, (void*)&otherImg.height, sizeof(int));                                           // image height
     ocl->setValue(
-        5, (void *)&args->maxSearchD, sizeof(unsigned int));                                // max search distance
+        5, (void *)&args->windowSize, sizeof(const char));                                  // window size
+    ocl->setValue(
+        6, (void *)&args->dir, sizeof(char));                                               // direction
+    ocl->setValue(
+        7, (void *)&args->maxSearchD, sizeof(unsigned int));                                // max search distance
 
     success = ocl->executeKernel(width, height, 16, 16);
 
@@ -876,7 +896,7 @@ Pixel Image::getPixel(unsigned int x, unsigned int y)
  */
 unsigned char Image::getGrayPixel(unsigned int x, unsigned int y)
 {
-    return image[4 * (y * width + x)];
+    return image[y * width + x];
 }
 
 /**
@@ -902,7 +922,7 @@ bool Image::validCoordinates(unsigned int x, unsigned int y)
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- * Calculates the average pixel value of the image.
+ * Calculates the average pixel value of the image or a portion of it.
  * Assumes the image is in grayscale.
  *
  * @param startX    The X value to start from (default = 0).

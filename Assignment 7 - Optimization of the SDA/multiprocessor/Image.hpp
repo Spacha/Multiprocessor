@@ -73,7 +73,7 @@ public:
     size_t height;                      // image height
     MiniOCL *ocl = nullptr;             // Handle to OpenCL wrapper class for parallel execution
 
-    Image();
+    Image(bool singleChannel = false);
     ~Image();
     void setOpenCL(MiniOCL *ocl);
     void setSingleChannel(bool singleChannel);
@@ -109,6 +109,17 @@ public:
     size_t sizeBytes();
     unsigned char grayAverage(unsigned int startX = 0, unsigned int startY = 0, size_t w = 0, size_t h = 0);
     bool validCoordinates(unsigned int x, unsigned int y);
+};
+
+/**
+ * A simple wrapper for Image that makes it explicit
+ * that the image is single channel (grayscale).
+ */
+class GrayImage : public Image
+{
+public:
+    GrayImage();
+    ~GrayImage();
 };
 
 /* TEMPORARY */
