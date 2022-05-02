@@ -693,7 +693,7 @@ bool Image::crossCheck(Image &left, Image &right, int threshold /* = 8 */)
     cout << "Performing cross-check... ";
 
     // the disparity maps must be exactly the same size
-    if (left.width != right.width || left.height != right.height)
+    if (left.width != right.width || left.height != right.height || left.singleChannel != right.singleChannel)
         return false;
 
     this->createEmpty(left.width, left.height);
@@ -714,7 +714,11 @@ bool Image::crossCheck(Image &left, Image &right, int threshold /* = 8 */)
     ocl->setOutputImageBuffer(
         2, static_cast<void *>(image.data()), width, height, singleChannel);        // image out
     ocl->setValue(
-        3, (void *)&threshold, sizeof(unsigned int));                               // threshold
+        3, (void*)&left.width, sizeof(int));                                        // image width
+    ocl->setValue(
+        4, (void*)&left.height, sizeof(int));                                       // image height
+    ocl->setValue(
+        5, (void *)&threshold, sizeof(unsigned int));                               // threshold
 
     success = ocl->executeKernel(width, height, 16, 16);
 
@@ -787,6 +791,10 @@ bool Image::occlusionFill()
         0, static_cast<void *>(image.data()), width, height, singleChannel);
     ocl->setOutputImageBuffer(
         1, static_cast<void *>(image.data()), width, height, singleChannel);
+    ocl->setValue(
+        2, (void*)&width, sizeof(int));
+    ocl->setValue(
+        3, (void*)&height, sizeof(int));
 
     success = ocl->executeKernel(width, height, 16, 16);
 

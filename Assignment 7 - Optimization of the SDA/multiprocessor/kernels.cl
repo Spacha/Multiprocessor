@@ -188,24 +188,24 @@ __kernel void calc_zncc(__global uchar *in_this,
 /**
  * NOTE: Assumes grayscale image.
  **/
-__kernel void cross_check(__read_only image2d_t in_left,
-                          __read_only image2d_t in_right,
-                          __write_only image2d_t out,
+__kernel void cross_check(__global uchar *in_left,
+                          __global uchar *in_right,
+                          __global uchar *out,
+                          int w, int h,
                           unsigned int threshold)
 {
     int2 pos = (int2)(get_global_id(0), get_global_id(1));
+    int idx = pos.y * w + pos.x;
 
-    float4 leftPixel = read_imagef( in_left, sampler, pos );
-    float4 rightPixel = read_imagef( in_right, sampler, pos );
+    uchar leftPixel = in_left[idx];       //float4 leftPixel = read_imagef( in_left, sampler, pos );
+    uchar rightPixel = in_right[idx];     //float4 rightPixel = read_imagef( in_right, sampler, pos );
 
     // If there is a sufficiently large difference between the images,
     // replace the pixel with tranparent black pixel.
-    if (fabs(leftPixel[0] - rightPixel[0]) > (float)(threshold / 255.0f))
-    {
-        write_imagef( out, pos, (float4)(0.0f, 0.0f, 0.0f, 0.0f) );
-    } else {
-        write_imagef( out, pos, leftPixel );
-    }
+    if (abs(leftPixel - rightPixel) > threshold)
+        out[idx] = 0;   //write_imagef( out, pos, (float4)(0.0f, 0.0f, 0.0f, 0.0f) );
+    else
+        out[idx] = leftPixel;   //write_imagef( out, pos, leftPixel );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -218,35 +218,37 @@ __kernel void cross_check(__read_only image2d_t in_left,
  * + very fast
  * - the resulting fill has 'tears' on some edges
  **/
-__kernel void occlusion_fill_left(__read_only image2d_t in,
-                                  __write_only image2d_t out)
+__kernel void occlusion_fill_left(__global uchar *in,
+                                  __global uchar *out,
+                                  int w, int h)
 {
     int2 pos = (int2)(get_global_id(0), get_global_id(1));
+    int idx = pos.y * w + pos.x;
 
-    float4 clr = read_imagef( in, sampler, pos );
+    uchar clr = in[idx];   //float4 clr = read_imagef( in, sampler, pos );
 
     // just copy the pixel...
-    if (clr[0] > 0)
+    if (clr > 0)
     {
-        write_imagef( out, pos, clr );
+        out[idx] = clr;     //write_imagef( out, pos, clr );
         return;
     }
 
     for (int x0 = pos.x; x0 >= 0; x0--)
     {
         //unsigned char p0 = this->getGrayPixel(x0, y);
-        float4 clr0 = read_imagef( in, sampler, (int2)(x0, pos.y) );
+        uchar clr0 = in[pos.y * w + x0]; //float4 clr0 = read_imagef( in, sampler, (int2)(x0, pos.y) );
 
-        if (clr0[0] > 0)
+        if (clr0 > 0)
         {
             // replace current pixel (that is zero) with clr0
-            write_imagef( out, pos, clr0 );
+            out[idx] = clr0; //write_imagef( out, pos, clr0 );
             return;
         }
     }
 
     // if no pixels found on the left, replace with black pixel
-    write_imagef( out, pos, (float4)(0.0f, 0.0f, 0.0f, 1.0f) );
+    out[idx] = 0;   //write_imagef( out, pos, (float4)(0.0f, 0.0f, 0.0f, 1.0f) );
 }
 
 /**
@@ -256,19 +258,21 @@ __kernel void occlusion_fill_left(__read_only image2d_t in,
  * + more accurate fill
  * - more complex -> slightly slower
  */
-__kernel void occlusion_fill_nearest(__read_only image2d_t in,
-                                     __write_only image2d_t out)
+__kernel void occlusion_fill_nearest(__global uchar *in,
+                                     __global uchar *out,
+                                     int w, int h)
 {
     int2 pos = (int2)(get_global_id(0), get_global_id(1));
-    float w = get_image_width(in);
-    float h = get_image_height(in);
+    int idx = pos.y * w + pos.x;
+    //float w = get_image_width(in);
+    //float h = get_image_height(in);
 
-    float4 clr = read_imagef( in, sampler, pos );
+    uchar clr = in[idx];    //float4 clr = read_imagef( in, sampler, pos );
 
     // just copy the pixel...
-    if (clr[0] > 0)
+    if (clr > 0)
     {
-        write_imagef( out, pos, clr );
+        out[idx] = clr;     //write_imagef( out, pos, clr );
         return;
     }
 
@@ -281,7 +285,7 @@ __kernel void occlusion_fill_nearest(__read_only image2d_t in,
         {
             int x0 = pos.x + dirX * i;
             if (x0 < 0 || x0 > (w - 1))
-                    continue;
+                continue;
 
             for (char dirY = -1; dirY <= 1; dirY++)
             {
@@ -290,12 +294,12 @@ __kernel void occlusion_fill_nearest(__read_only image2d_t in,
                     continue;
 
                 //unsigned char p0 = this->getGrayPixel(x0, y);
-                float4 clr0 = read_imagef( in, sampler, (int2)(x0, y0) );
+                uchar clr0 = in[y0 * w + x0];   //float4 clr0 = read_imagef( in, sampler, (int2)(x0, y0) );
 
-                if (clr0[0] > 0)
+                if (clr0 > 0)
                 {
                     // replace current pixel (that is zero) with clr0
-                    write_imagef( out, pos, clr0 );
+                    out[idx] = clr0;    //write_imagef( out, pos, clr0 );
                     return;
                 }
             }
@@ -303,7 +307,7 @@ __kernel void occlusion_fill_nearest(__read_only image2d_t in,
     }
 
     // if no pixels found on the left, replace with black pixel
-    write_imagef( out, pos, (float4)(0.0f, 0.0f, 0.0f, 1.0f) );
+    out[idx] = 0;   //write_imagef( out, pos, (float4)(0.0f, 0.0f, 0.0f, 1.0f) );
 }
 
 
