@@ -111,7 +111,7 @@ __kernel void calc_zncc(__global uchar *in_this,
     float clr;
     for (unsigned int y = pos.y - halfWindow; y < pos.y + halfWindow; y++) {
         for (unsigned int x = pos.x - halfWindow; x < pos.x + halfWindow; x++) {
-            windowSum += in_other[y * w + x] / 255.0f; //clr = read_imagef( in_this, sampler, (int2)(x, y) );
+            windowSum += in_this[y * w + x] / 255.0f; //clr = read_imagef( in_this, sampler, (int2)(x, y) );
         }
     }
     float leftAvg = (windowSum / (windowSize * windowSize));

@@ -466,9 +466,9 @@ bool Image::calcZNCC(Image &otherImg, Image *disparityMap, unsigned int windowSi
     ocl->setOutputImageBuffer(
         2, static_cast<void *>(disparityMap->image.data()), width, height, singleChannel);  // image out (disparity map)
     ocl->setValue(
-        3, (void*)&otherImg.width, sizeof(int));                                            // image width
+        3, (void*)&width, sizeof(int));                                                     // image width
     ocl->setValue(
-        4, (void*)&otherImg.height, sizeof(int));                                           // image height
+        4, (void*)&height, sizeof(int));                                                    // image height
     ocl->setValue(
         5, (void *)&args->windowSize, sizeof(const char));                                  // window size
     ocl->setValue(

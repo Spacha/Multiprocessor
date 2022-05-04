@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 
     Image *leftImg = new Image();               // left stereo image
     Image *rightImg = new Image();              // right stereo image
-    Image finalImg;                             // final image after cross-checking
+    GrayImage finalImg;                         // final image after cross-checking
 
     // if an arguments are provided, use them as image name
     if (argc > 2)
@@ -194,8 +194,8 @@ int main(int argc, char *argv[])
 
     // 4. Calculate stereo disparity (ZNCC) for both images
 
-    Image *leftDispImg = new Image();      // contains the left-to-right disparity map
-    Image *rightDispImg = new Image();     // contains the right-to-left disparity map
+    Image *leftDispImg = new GrayImage();   // contains the left-to-right disparity map
+    Image *rightDispImg = new GrayImage();  // contains the right-to-left disparity map
 
     ptimer.reset();
     success = leftImg->calcZNCC(*rightImg, leftDispImg, windowSize, maxSearchD);

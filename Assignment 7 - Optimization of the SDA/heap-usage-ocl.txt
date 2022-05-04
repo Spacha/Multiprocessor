@@ -1,0 +1,22 @@
+1.  Beginning: 2 625,80 kB
+    Image (208 bytes)
+2.  Both loaded: 48 932,04 kB
+    Image data (two 4-channel) 47,42 MB
+    Image x2 (208 bytes)
+3.  Both downscaled: 6 217,56 kB
+    Image data (two 4-channel) 2,96 MB
+    Image x2 (208 bytes)
+4.  Both grayscaled: 4 703,63 kB
+    Image data (two 1-channel) 741 kB
+    Image x4 (416 bytes)
+    GrayImage x2 (208 bytes)
+5.  ZNCC: 5 355,67 kB
+    Image data (two 1-channel) 741 kB
+    Image x2 (208 bytes)
+    GrayImage x2 (208 bytes)
+6.  Cross-checked: 5 319,43 kB
+    Image data (single 1-channel) 370 kB
+    Image x2 (208 bytes)
+7.  Occlusion-filled: 5 633,65 kB
+    Image data (single 1-channel) 370 kB
+    Image x2 (208 bytes)
