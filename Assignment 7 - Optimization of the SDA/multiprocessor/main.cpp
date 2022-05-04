@@ -146,31 +146,6 @@ int main(int argc, char *argv[])
     CHECK_ERROR(success, "Error downscaling the right image.")
     ptimer.printTime();
 
-#ifdef USE_ZNCC_KERNEL /* Specialiced execution with single kernel */
-
-    cout << "USING SINGLE KERNEL FOR ALL." << endl;
-
-    ptimer.reset();
-    success = leftImg->calcStereoDisparity(*rightImg, &finalImg, windowSize, maxSearchD);
-    CHECK_ERROR(success, "Error calculating stereo disparity.")
-    ptimer.printTime();
-
-    (void)ccThreshold;
-    (void)downscaleFactor;
-
-    ptimer.reset();
-    success = finalImg.save("img/final-image.png");
-    CHECK_ERROR(success, "Error saving image to disk.")
-    ptimer.printTime();
-
-#ifdef USE_OCL
-    // print the actual kernel execution time
-    kernelTime = ocl.getExecutionTime();
-    printf("\t=> Right image kernel execution time: %0.3f ms \n", kernelTime / 1000.0f);
-#endif /* USE_OCL */
-
-#else /* Normal, more modular execution */
-
     // 3. Convert both images to grayscale
     ptimer.reset();
     success = leftImg->convertToGrayscale();
@@ -260,7 +235,6 @@ int main(int argc, char *argv[])
     success = finalImg.save("img/4-occlusion-filled.png");
     CHECK_ERROR(success, "Error saving image to disk.")
     ptimer.printTime();
-#endif
 
     return EXIT_SUCCESS;
 }

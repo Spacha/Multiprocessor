@@ -6,7 +6,7 @@
 
 # Global configs
 CXX       = g++
-CFLAGS    = -Wall
+CFLAGS    = -Wall -O3
 
 # Libraries
 EXT_LIB   = $(OCL_ROOT)/lib/x86_64/opencl.lib

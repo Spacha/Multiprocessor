@@ -6,9 +6,6 @@
 #include <vector>
 #include <inttypes.h>
 
-/* Specialiced execution with single kernel */
-//#define USE_ZNCC_KERNEL
-
 /* These are the options for COMPUTE_DEVICE. */
 #define TARGET_NONE     0       // Don't use OpenCL
 #define TARGET_GPU      1       // OpenCL on GPU

@@ -6,7 +6,7 @@
 
 # Global configs
 CXX       = g++
-CFLAGS    = -Wall
+CFLAGS    = -Wall -O3
 
 # Libraries
 EXT_LIB   = $(OCL_ROOT)/lib/x86_64/opencl.lib
@@ -17,5 +17,5 @@ OUT = stereo.exe
 
 # NOTE: DONT'T ALWAYS INCLUDE EVERYTHING FOR FUN?
 all: $(SRC)
-	$(CXX) $(CFLAGS) $(SRC) $(EXT_LIB) -I $(EXT_INC) -o $(OUT) -fopenmp -O3
+	$(CXX) $(CFLAGS) $(SRC) $(EXT_LIB) -I $(EXT_INC) -o $(OUT) -fopenmp
 	@echo Done. Run using: "stereo.exe LEFT_IMAGE RIGHT_IMAGE [WINDOW_SIZE=9] [MAX_SEARCH_DIST=32] [CROSS_CHECK_THRESHOLD=8] [DOWNSCALE_FACTOR=4]"

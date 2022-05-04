@@ -1,3 +1,36 @@
+################################################################################
+ORIGINAL
+################################################################################
+
+Load & decode
+    => time: 2.444 ms
+Resize
+    => time: 816.663 ms
+Trasnform to grayscale
+    => time: 349.622 ms
+    => Right image kernel execution time: 0.019 ms
+Encode & Save
+    => time: 301.567 ms
+ZNCC
+    => time: 510.354 ms
+    => Kernel execution time: 69.734 ms
+Encode & Save
+    => time: 287.210 ms
+Cross-check
+    => time: 179.125 ms
+    => Kernel execution time: 0.029 ms
+Encode & save
+    => time: 138.841 ms
+Occlusion fill
+    => time: 172.679 ms
+    => Kernel execution time: 0.349 ms
+Encode & save
+    => time: 108.529 ms
+
+################################################################################
+OPTIMIZATION
+################################################################################
+
 Load & decode
     => time: 944.068 ms
 Resize
@@ -28,11 +61,11 @@ SINGLE CHANNEL OPTIMIZATION
 ################################################################################
 
 Load & decode
-    => time: 831.032 ms
+    => time: 827.147 ms
 Resize
-    => time: 515.813 ms
+    => time: 497.539 ms
 Trasnform to grayscale
-    => time: 373.261 ms
+    => time: 362.641 ms
     => Right image kernel execution time: 0.025 ms
 Encode & Save
     => time: 111.906 ms
